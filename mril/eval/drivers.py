@@ -13,6 +13,7 @@ import json
 import re
 import urllib.error
 import urllib.request
+import zlib
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -41,6 +42,7 @@ class AgentDriver(Protocol):
         workspace: Workspace,
         attempt_index: int,
         prior_feedback: str | None,
+        seed: int | None = None,
     ) -> DriverResult: ...
 
 
@@ -70,11 +72,37 @@ class OllamaDriver:
         host: str = "http://127.0.0.1:11434",
         timeout: int = 300,
         num_predict: int = 2048,
+        temperature: float = 0.2,
+        top_p: float = 0.9,
+        num_ctx: int = 8192,
     ) -> None:
         self.models = models
         self.host = host.rstrip("/")
         self.timeout = timeout
-        self.num_predict = num_predict
+        # Pinned sampling parameters — every run in a matrix must generate
+        # under identical options or arm comparisons mix two experimental
+        # configurations. Recorded in the manifest via `generation_options`.
+        self.options = {
+            "num_predict": num_predict,
+            "temperature": temperature,
+            "top_p": top_p,
+            "num_ctx": num_ctx,
+        }
+
+    @staticmethod
+    def gen_seed(run_seed: int, task_id: str, model_tag: str, attempt_index: int) -> int:
+        """Deterministic generation seed per (run, task, model, attempt).
+
+        Same task+model+attempt under the same run_seed draws the same
+        sampling seed across arms — paired comparisons aren't confounded by
+        different random draws, while different seeds still probe generation
+        reliability. temperature>0 is what makes seed meaningful.
+        """
+        return zlib.crc32(f"{run_seed}:{task_id}:{model_tag}:{attempt_index}".encode())
+
+    @property
+    def generation_options(self) -> dict:
+        return {**self.options, "seed_rule": "crc32(run_seed:task_id:model_tag:attempt_index)"}
 
     def generate(
         self,
@@ -84,6 +112,7 @@ class OllamaDriver:
         workspace: Workspace,
         attempt_index: int,
         prior_feedback: str | None,
+        seed: int | None = None,
     ) -> DriverResult:
         tag = self.models.get(model_id, model_id)
         current = workspace.read(spec.target_file)
@@ -98,12 +127,15 @@ class OllamaDriver:
             )
             + f"Reply with ONLY the complete new contents of {spec.target_file}."
         )
+        options = dict(self.options)
+        if seed is not None:
+            options["seed"] = self.gen_seed(seed, spec.task_id, tag, attempt_index)
         body = json.dumps(
             {
                 "model": tag,
                 "prompt": prompt,
                 "stream": False,
-                "options": {"num_predict": self.num_predict},
+                "options": options,
             }
         ).encode()
         req = urllib.request.Request(

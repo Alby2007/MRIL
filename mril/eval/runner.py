@@ -78,6 +78,7 @@ class EvalRunner:
                     workspace=ws,
                     attempt_index=attempt_i,
                     prior_feedback=feedback,
+                    seed=seed,
                 )
                 model_calls += 1
                 router.observe_invocation(
@@ -170,6 +171,9 @@ def run_matrix(
         # registry model_id -> backend tag, when the driver exposes one —
         # the same logical tier can point at different weights across runs
         "model_map": getattr(runner.driver, "models", None),
+        # pinned sampling params — routing is seeded, but seeded routing
+        # means nothing if generation itself is uncontrolled
+        "generation": getattr(runner.driver, "generation_options", None),
         "cost_basis": "synthetic_token_price",
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }

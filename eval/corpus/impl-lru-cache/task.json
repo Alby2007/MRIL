@@ -1,0 +1,32 @@
+{
+  "id": "impl-lru-cache",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-lru-cache/snapshot",
+    "sha256": "72f0a077986b3bb80be24002daef97d079791f78d512c25305f3ad70060f9f5d"
+  },
+  "task": {
+    "instruction": "Implement LRUCache(capacity) in solution.py: get(key) returns value or -1, put(key,value) inserts/updates and evicts the least-recently-used entry when over capacity. Both O(1). Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-lru-cache/verifiers/test_lru.py"
+    ],
+    "command": "{python} -m pytest {verify}test_lru.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard"
+  }
+}

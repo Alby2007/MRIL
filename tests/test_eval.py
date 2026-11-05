@@ -87,7 +87,7 @@ class ScriptedDriver:
         self.script = script
         self.calls = []
 
-    def generate(self, *, model_id, spec, workspace, attempt_index, prior_feedback):
+    def generate(self, *, model_id, spec, workspace, attempt_index, prior_feedback, seed=None):
         self.calls.append(model_id)
         body = self.script[model_id][min(attempt_index, len(self.script[model_id]) - 1)]
         workspace.write(spec.target_file, body)

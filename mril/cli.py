@@ -92,7 +92,10 @@ def cmd_eval_run(args) -> int:
     if missing:
         print(f"no --ollama-model mapping for: {', '.join(missing)}", file=sys.stderr)
         return 1
-    driver = OllamaDriver(models, host=args.ollama_host)
+    driver = OllamaDriver(
+        models, host=args.ollama_host,
+        temperature=args.temperature, top_p=args.top_p, num_ctx=args.num_ctx,
+    )
     runner = EvalRunner(
         registry=registry,
         driver=driver,
@@ -160,6 +163,9 @@ def main(argv: list[str] | None = None) -> int:
     er.add_argument("--ollama-model", action="append", default=[],
                     metavar="REG_ID=TAG", help="registry model_id -> ollama tag (repeatable)")
     er.add_argument("--ollama-host", default="http://127.0.0.1:11434")
+    er.add_argument("--temperature", type=float, default=0.2)
+    er.add_argument("--top-p", type=float, default=0.9)
+    er.add_argument("--num-ctx", type=int, default=8192)
     er.set_defaults(fn=cmd_eval_run)
 
     ep = evsub.add_parser("report", help="rebuild the report from an eval output dir")

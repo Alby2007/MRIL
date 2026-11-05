@@ -1,0 +1,32 @@
+{
+  "id": "bug-binary-search",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-binary-search/snapshot",
+    "sha256": "de53418f34d2979e5b22907d27fc19659a9cc71691dab023a3b888f4322badbb"
+  },
+  "task": {
+    "instruction": "Fix binary_search(arr, target) in solution.py: return the index of target in sorted arr or -1. The current code hangs or gives wrong answers on some inputs. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-binary-search/verifiers/test_bs.py"
+    ],
+    "command": "{python} -m pytest {verify}test_bs.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium"
+  }
+}
