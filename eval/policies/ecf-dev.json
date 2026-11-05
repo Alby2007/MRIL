@@ -1,0 +1,135 @@
+{
+  "beta": {
+    "feat:api_kind=class": [
+      6.0,
+      3.0
+    ],
+    "feat:api_kind=fix": [
+      18.0,
+      0.0
+    ],
+    "feat:api_kind=function": [
+      9.0,
+      9.0
+    ],
+    "feat:category=bug_fix": [
+      21.0,
+      0.0
+    ],
+    "feat:category=feature": [
+      12.0,
+      12.0
+    ],
+    "feat:rule_markers=": [
+      30.0,
+      0.0
+    ],
+    "feat:rule_markers=edge_cases+numeric": [
+      0.0,
+      3.0
+    ],
+    "feat:rule_markers=numeric": [
+      0.0,
+      3.0
+    ],
+    "feat:rule_markers=ordering+quoting": [
+      0.0,
+      3.0
+    ],
+    "feat:rule_markers=quoting": [
+      0.0,
+      3.0
+    ],
+    "feat:rule_markers=stateful": [
+      3.0,
+      0.0
+    ],
+    "feat:scope=single_file": [
+      21.0,
+      0.0
+    ],
+    "feat:scope=single_module": [
+      12.0,
+      12.0
+    ],
+    "feat:spec_clauses=few": [
+      9.0,
+      0.0
+    ],
+    "feat:spec_clauses=many": [
+      24.0,
+      12.0
+    ],
+    "global": [
+      33.0,
+      12.0
+    ],
+    "sig:api_kind=class|category=bug_fix|rule_markers=|scope=single_module|spec_clauses=many": [
+      3.0,
+      0.0
+    ],
+    "sig:api_kind=class|category=feature|rule_markers=numeric|scope=single_module|spec_clauses=many": [
+      0.0,
+      3.0
+    ],
+    "sig:api_kind=class|category=feature|rule_markers=|scope=single_module|spec_clauses=many": [
+      3.0,
+      0.0
+    ],
+    "sig:api_kind=fix|category=bug_fix|rule_markers=stateful|scope=single_file|spec_clauses=few": [
+      3.0,
+      0.0
+    ],
+    "sig:api_kind=fix|category=bug_fix|rule_markers=|scope=single_file|spec_clauses=few": [
+      3.0,
+      0.0
+    ],
+    "sig:api_kind=fix|category=bug_fix|rule_markers=|scope=single_file|spec_clauses=many": [
+      6.0,
+      0.0
+    ],
+    "sig:api_kind=fix|category=bug_fix|rule_markers=|scope=single_module|spec_clauses=many": [
+      6.0,
+      0.0
+    ],
+    "sig:api_kind=function|category=feature|rule_markers=edge_cases+numeric|scope=single_module|spec_clauses=many": [
+      0.0,
+      3.0
+    ],
+    "sig:api_kind=function|category=feature|rule_markers=ordering+quoting|scope=single_module|spec_clauses=many": [
+      0.0,
+      3.0
+    ],
+    "sig:api_kind=function|category=feature|rule_markers=quoting|scope=single_module|spec_clauses=many": [
+      0.0,
+      3.0
+    ],
+    "sig:api_kind=function|category=feature|rule_markers=|scope=single_file|spec_clauses=few": [
+      3.0,
+      0.0
+    ],
+    "sig:api_kind=function|category=feature|rule_markers=|scope=single_file|spec_clauses=many": [
+      6.0,
+      0.0
+    ]
+  },
+  "cost_model": {
+    "c_handoff": 0.00061125,
+    "c_strong_after_fail": 0.007494583333333333,
+    "c_strong_fresh": 0.0034733333333333335,
+    "c_weak": 6.308e-05,
+    "lat_strong_ms": 5243.571422222222,
+    "lat_weak_ms": 741.4454844444444,
+    "q_fresh": 0.8624999999999999,
+    "q_recovery": 0.56
+  },
+  "epsilon": 0.0,
+  "fallback": "cheap",
+  "feature_version": "1",
+  "prior_strength": 3.0,
+  "quality_margin": 0.05,
+  "snapshot_hash": "972803350f050723",
+  "trained_from_ledger": "eval/runs/study-03-train/eval.db",
+  "trained_on_runs": 90,
+  "version": "1"
+}

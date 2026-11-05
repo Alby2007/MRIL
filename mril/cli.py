@@ -106,6 +106,16 @@ def cmd_eval_run(args) -> int:
         keep_workspaces=args.keep_workspaces,
     )
     wanted = {a.name: a for a in default_arms()}
+    if args.empirical_policy:
+        from mril.eval.arms import Arm
+        from mril.policy.empirical import EmpiricalCheapFirstPolicy, PolicySnapshot
+
+        snap = PolicySnapshot.from_dict(
+            json.loads(Path(args.empirical_policy).read_text())
+        )
+        wanted["empirical-cheap-first"] = Arm(
+            "empirical-cheap-first", EmpiricalCheapFirstPolicy(snapshot=snap)
+        )
     arms = tuple(wanted[n] for n in args.arms.split(",") if n in wanted)
     seeds = tuple(int(s) for s in args.seeds.split(","))
     results = run_matrix(
@@ -117,6 +127,21 @@ def cmd_eval_run(args) -> int:
     report = build_report(results, manifest)
     write_report(report, args.out)
     print(f"{len(results)} runs -> {args.out}/REPORT.md")
+    return 0
+
+
+def cmd_eval_train(args) -> int:
+    from mril.eval.train import fit_to_file
+
+    snap = fit_to_file(
+        args.ledger, args.out,
+        weak_id=args.weak, strong_id=args.strong,
+        prior_strength=args.prior_strength,
+        quality_margin=args.quality_margin, epsilon=args.epsilon,
+    )
+    print(f"snapshot {snap.hash} -> {args.out} "
+          f"({snap.trained_on_runs} runs, "
+          f"global weak rate {snap.beta.get('global')})")
     return 0
 
 
@@ -166,7 +191,19 @@ def main(argv: list[str] | None = None) -> int:
     er.add_argument("--temperature", type=float, default=0.2)
     er.add_argument("--top-p", type=float, default=0.9)
     er.add_argument("--num-ctx", type=int, default=8192)
+    er.add_argument("--empirical-policy", metavar="SNAPSHOT.json",
+                    help="add an empirical-cheap-first arm from a trained snapshot")
     er.set_defaults(fn=cmd_eval_run)
+
+    et = evsub.add_parser("train", help="fit an empirical-routing snapshot from a ledger")
+    et.add_argument("--ledger", required=True, help="path to an eval eval.db")
+    et.add_argument("--out", required=True, help="snapshot JSON out path")
+    et.add_argument("--weak", default="weak-coder", help="weak model_id")
+    et.add_argument("--strong", default="strong-coder", help="strong model_id")
+    et.add_argument("--prior-strength", type=float, default=3.0)
+    et.add_argument("--quality-margin", type=float, default=0.05)
+    et.add_argument("--epsilon", type=float, default=0.0)
+    et.set_defaults(fn=cmd_eval_train)
 
     ep = evsub.add_parser("report", help="rebuild the report from an eval output dir")
     ep.add_argument("out_dir")

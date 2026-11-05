@@ -52,6 +52,14 @@ class EvalRunner:
             max_attempts=spec.max_attempts,
             require_capabilities=self.default_constraints.require_capabilities,
         )
+        # transferable features travel to policies via ctx.metadata — the
+        # empirical arm reads them there; the ledger persists them on
+        # TaskStarted so PolicyTrainer can re-derive buckets post-hoc.
+        from mril.eval.features import extract_features
+
+        feats = extract_features(
+            spec, snapshot_dir=self.verifier.corpus_root / spec.snapshot
+        ).as_dict()
         ctx = TaskContext(
             task_id=run_task_id,
             language=spec.language,
@@ -59,7 +67,12 @@ class EvalRunner:
             scope=spec.scope,
             risk=spec.risk,
             harness="mril-eval",
-            metadata={"base_task": spec.task_id, "arm": arm.name, "seed": seed},
+            metadata={
+                "base_task": spec.task_id,
+                "arm": arm.name,
+                "seed": seed,
+                "features": feats,
+            },
         )
         ws = Workspace.materialize(spec, self.verifier.corpus_root, work_root, run_task_id.replace(":", "_"))
         t0, model_calls, feedback = time.monotonic(), 0, None
