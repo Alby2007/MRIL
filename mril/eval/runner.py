@@ -167,6 +167,9 @@ def run_matrix(
         "seeds": list(seeds),
         "run_order_seed": run_order_seed,
         "interleaved": True,
+        # registry model_id -> backend tag, when the driver exposes one —
+        # the same logical tier can point at different weights across runs
+        "model_map": getattr(runner.driver, "models", None),
         "cost_basis": "synthetic_token_price",
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }

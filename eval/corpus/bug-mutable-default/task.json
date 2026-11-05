@@ -1,0 +1,32 @@
+{
+  "id": "bug-mutable-default",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-mutable-default/snapshot",
+    "sha256": "97cc7beb1e09508213041fd2fbee7572fc27614738ecc004f8f738073fcb2dd8"
+  },
+  "task": {
+    "instruction": "Fix the mutable-default-argument bug in solution.py: calls without a list argument must not share state between calls. Reply with only the complete corrected file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_file",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-mutable-default/verifiers/test_mutable.py"
+    ],
+    "command": "{python} -m pytest {verify}test_mutable.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium"
+  }
+}

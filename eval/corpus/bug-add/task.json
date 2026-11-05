@@ -1,0 +1,32 @@
+{
+  "id": "bug-add",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-add/snapshot",
+    "sha256": "dace906323ea2cb8bfb2a4ff07c97ca8bec1e333fdb3e147be0204050a7a6539"
+  },
+  "task": {
+    "instruction": "Fix the bug in solution.py so add() returns the sum. Reply with only the complete corrected file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_file",
+    "risk": "low",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-add/verifiers/test_add.py"
+    ],
+    "command": "{python} -m pytest {verify}test_add.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "easy"
+  }
+}

@@ -22,11 +22,17 @@ class Corpus:
 
     @property
     def version(self) -> str:
-        """Content digest over all task specs — the corpus's reproducibility id."""
-        canonical = json.dumps(
-            sorted(t.digest() for t in self.tasks), sort_keys=True
-        )
-        return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+        """Content digest over task specs AND verifier file bytes — a frozen
+        corpus means the tests are pinned too, not just the snapshots."""
+        h = hashlib.sha256()
+        for t in sorted(self.tasks, key=lambda t: t.task_id):
+            h.update(t.digest().encode())
+            for vf in sorted(t.verifier_files):
+                p = self.root / vf
+                h.update(vf.encode())
+                h.update(b"\0")
+                h.update(hashlib.sha256(p.read_bytes()).digest() if p.is_file() else b"missing")
+        return h.hexdigest()[:16]
 
 
 def load_corpus(root: str | Path, *, verify_digests: bool = True) -> Corpus:

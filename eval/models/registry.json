@@ -1,0 +1,9 @@
+{
+  "version": "eval-v0.2",
+  "models": [
+    {"model_id": "weak-coder", "provider": "ollama", "tier": "cheap",
+     "input_price": 0.15, "output_price": 0.45},
+    {"model_id": "strong-coder", "provider": "ollama", "tier": "frontier",
+     "input_price": 5.00, "output_price": 25.00}
+  ]
+}

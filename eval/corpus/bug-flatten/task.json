@@ -1,0 +1,32 @@
+{
+  "id": "bug-flatten",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-flatten/snapshot",
+    "sha256": "213522c723d2251d3cdf771d1ea5519cbd370a8a4d6563a8aa85c31a20de9eb7"
+  },
+  "task": {
+    "instruction": "Fix the recursion bug in solution.py: nested dict keys must accumulate the full dotted path. Lists are leaf values. Reply with only the complete corrected file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_file",
+    "risk": "low",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-flatten/verifiers/test_flatten.py"
+    ],
+    "command": "{python} -m pytest {verify}test_flatten.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium"
+  }
+}

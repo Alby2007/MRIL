@@ -1,0 +1,32 @@
+{
+  "id": "impl-merge-intervals",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-merge-intervals/snapshot",
+    "sha256": "0dd7db99a901a16932478cbf04f89b9e6ca6d3245dea9f171b23921adfcce097"
+  },
+  "task": {
+    "instruction": "Implement merge_intervals(intervals) in solution.py: merge all overlapping or touching [start,end] pairs, return sorted non-overlapping intervals. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_file",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-merge-intervals/verifiers/test_intervals.py"
+    ],
+    "command": "{python} -m pytest {verify}test_intervals.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard"
+  }
+}
