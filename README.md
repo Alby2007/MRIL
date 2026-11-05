@@ -81,6 +81,16 @@ mril --db demo.db task issue-1842
 mril --db demo.db explain <decision_id>
 ```
 
+Real-agent demo (LangChain + Ollama + real pytest verification):
+
+```bash
+pip install -e ".[langchain]"
+ollama serve &
+# see examples/langgraph_agent.py header for the two `ollama create` lines
+python examples/langgraph_agent.py
+mril --db langgraph.db task palindrome-1
+```
+
 ## Roadmap
 
 - **M1 (here)**: event contract, ledger, deterministic tiered routing,

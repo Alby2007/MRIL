@@ -60,8 +60,14 @@ class TaskState:
 
 
 def rebuild_state(task_id: str, events: list[Event]) -> TaskState:
+    """Replay the ledger into per-attempt task state.
+
+    An *attempt* groups every model invocation sharing an attempt_id — one
+    agent run may make several model calls (steps). Costs and token counts
+    aggregate across the group; the attempt's model is the last one used.
+    """
     state = TaskState(task_id=task_id)
-    inv: dict[str, ModelInvocationFinished] = {}
+    inv: dict[str, list[ModelInvocationFinished]] = {}
     ver: dict[str, list[VerificationCompleted]] = {}
     order: list[str] = []
 
@@ -69,7 +75,7 @@ def rebuild_state(task_id: str, events: list[Event]) -> TaskState:
         if isinstance(e, ModelInvocationFinished) and e.attempt_id:
             if e.attempt_id not in inv:
                 order.append(e.attempt_id)
-            inv[e.attempt_id] = e
+            inv.setdefault(e.attempt_id, []).append(e)
         elif isinstance(e, VerificationCompleted) and e.attempt_id:
             ver.setdefault(e.attempt_id, []).append(e)
         elif isinstance(e, TaskStarted):
@@ -84,17 +90,17 @@ def rebuild_state(task_id: str, events: list[Event]) -> TaskState:
             state.task_outcome = e.task_outcome
 
     for aid in order:
-        i = inv[aid]
-        cost = i.cost_usd or 0.0
+        calls = inv[aid]
+        cost = sum(i.cost_usd or 0.0 for i in calls)
         v = ver.get(aid, [])
         last_v = v[-1] if v else None
         state.attempts.append(
             AttemptRecord(
                 attempt_id=aid,
-                model_id=i.model_id,
+                model_id=calls[-1].model_id,
                 cost_usd=cost,
-                input_tokens=i.input_tokens,
-                api_error=i.api_error,
+                input_tokens=max((i.input_tokens or 0 for i in calls), default=None),
+                api_error=next((i.api_error for i in reversed(calls) if i.api_error), None),
                 verification_status=last_v.status if last_v else None,
                 verifier_type=last_v.verifier_type if last_v else None,
                 failure_category=last_v.failure_category if last_v else None,

@@ -14,9 +14,14 @@ from __future__ import annotations
 import time
 from typing import Any, Callable, Mapping
 
-from mril.core.events import TaskOutcome, VerificationStatus
+from mril.core.events import TaskOutcome, VerificationStatus, new_event_id
 from mril.core.task import RoutingConstraints, TaskContext
 from mril.sdk import Router
+
+try:  # subclassing is required for create_agent to discover the hooks
+    from langchain.agents.middleware import AgentMiddleware as _Base
+except Exception:  # LangChain not installed — still importable, still testable
+    _Base = object
 
 FeatureExtractor = Callable[[Any], dict]
 ModelResolver = Callable[[str], Any]
@@ -33,7 +38,7 @@ def _default_features(request: Any) -> dict:
     return feats
 
 
-class MRILMiddleware:
+class MRILMiddleware(_Base):
     """Drop-in LangChain middleware driven by an MRIL Router.
 
     models: mapping from registry model_id -> LangChain chat model instance
@@ -56,17 +61,25 @@ class MRILMiddleware:
         self.extract_features = feature_extractor or _default_features
         self._fixed_task_id = task_id
         self._step = 0
+        self._attempt_id: str | None = None
 
     # -- lifecycle -----------------------------------------------------------
 
     def before_agent(self, state: Any = None, runtime: Any = None) -> None:
-        return None  # TaskStarted is emitted lazily by Router.route()
-
-    def after_agent(self, state: Any = None, runtime: Any = None) -> None:
-        task_id = self._task_id(state)
-        if task_id:
-            self.router.finalize(task_id)
+        # One agent run == one MRIL attempt. All model calls in this run share
+        # the attempt_id; their invocations are steps within it. (TaskStarted
+        # itself is emitted lazily by Router.route().)
+        self._attempt_id = new_event_id()
+        self._step = 0
         return None
+
+    async def abefore_agent(self, state: Any = None, runtime: Any = None) -> None:
+        return self.before_agent(state, runtime)
+
+    # NOTE: no after_agent finalization. An MRIL *task* spans multiple agent
+    # invocations (attempt -> escalate -> retry); the driver — not the graph —
+    # decides when it's done and calls router.finalize(). Auto-finalizing here
+    # would close the task before recovery can run.
 
     # -- model-call interception ----------------------------------------------
 
@@ -137,11 +150,14 @@ class MRILMiddleware:
         return request, decision
 
     def _observe(self, decision, response: Any, started: float, api_error: str | None) -> None:
-        usage = getattr(response, "usage_metadata", None) if response is not None else None
+        usage = _extract_usage(response)
+        if self._attempt_id is None:  # wrapped outside an agent run
+            self._attempt_id = new_event_id()
         self.router.observe_invocation(
             decision.decision_id,
             decision.model_id,
             task_id=decision.task_id,
+            attempt_id=self._attempt_id,
             input_tokens=_usage_get(usage, "input_tokens"),
             output_tokens=_usage_get(usage, "output_tokens"),
             cached_input_tokens=_usage_get(
@@ -158,12 +174,26 @@ class MRILMiddleware:
             return self._models(model_id)
         return self._models.get(model_id)
 
-    def _task_id(self, state: Any) -> str | None:
-        if self._fixed_task_id:
-            return self._fixed_task_id
-        if isinstance(state, Mapping):
-            return state.get("task_id")
-        return getattr(state, "task_id", None)
+
+def _extract_usage(response: Any) -> Any:
+    """Pull usage_metadata off whatever the handler returned.
+
+    LangChain 1.x handlers may return a ModelResponse (whose `.result` is a
+    list of BaseMessage) or an AIMessage directly; usage_metadata lives on the
+    AI message in both cases.
+    """
+    if response is None:
+        return None
+    if getattr(response, "usage_metadata", None) is not None:
+        return response.usage_metadata
+    result = getattr(response, "result", None)
+    if isinstance(result, (list, tuple)):
+        for msg in result:
+            if getattr(msg, "usage_metadata", None) is not None:
+                return msg.usage_metadata
+    elif getattr(result, "usage_metadata", None) is not None:
+        return result.usage_metadata
+    return None
 
 
 def _usage_get(usage: Any, key: str, nested: str | None = None) -> int | None:
