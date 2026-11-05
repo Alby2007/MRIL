@@ -1,0 +1,34 @@
+{
+  "id": "impl-validate-request",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-validate-request/snapshot",
+    "sha256": "18aed7f78f8641159969811c8ec699fab9355111e5602c237f314909a9e72591"
+  },
+  "task": {
+    "instruction": "Implement a RequestValidator class in solution.py: constructed with a spec dict mapping field -> ('required'|'optional', type, lo, hi); validate(payload) accumulates every problem \u2014 a missing required field, a wrong type like an int given a str, an out-of-range value, or an unknown key which is invalid \u2014 into .errors and gives back False. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-validate-request/verifiers/test_v.py"
+    ],
+    "command": "{python} -m pytest {verify}test_v.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard",
+    "family": "api_validation",
+    "cell_api": "class"
+  }
+}

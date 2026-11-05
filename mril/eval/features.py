@@ -20,13 +20,16 @@ __all__ = ["FEATURE_VERSION", "TaskFeatures", "extract_features"]
 
 # Rule-type markers — keyword groups that signal a specific, checkable
 # contract clause in the instruction. Each present group is one more
-# independent way a model can be subtly wrong.
+# independent way a model can be subtly wrong. Word-PREFIX matching: the
+# instruction "parse quoted fields" must fire quoting even though the
+# literal tokens are "parse"/"quoted" — v1's full-word \b..\b patterns
+# under-fired and emptied buckets.
 _RULE_MARKERS = {
-    "ordering": r"\b(sort|order|rank|alphabet|ascend|descend|tie[- ]?break|frequent)\b",
-    "quoting": r"\b(quote|escap|pars|serializ|deserializ|delimit|whitespace|strip)\b",
-    "numeric": r"\b(coerce|cast|int|float|bool|round|precis|ratio|rate|refill|percent)\b",
-    "edge_cases": r"\b(empty|missing|invalid|none|null|comment|top[- ]?level|duplicate|boundary)\b",
-    "stateful": r"\b(cache|evict|state|accumulat|bucket|counter|session|track)\b",
+    "ordering": r"\b(sort|order|rank|alphabet|ascend|descend|tie[- ]?break|frequent)",
+    "quoting": r"\b(quote|quoting|escap|pars|serializ|deserializ|delimit|whitespace|strip)",
+    "numeric": r"(?:\b(coerce|cast|float|bool|round|precis|ratio|rate|refill|percent)|\bint\b)",
+    "edge_cases": r"(?:\b(empty|missing|invalid|null|comment|top[- ]?level|duplicate|boundar)|\bnone\b)",
+    "stateful": r"(?:\b(cache|evict|accumulat|bucket|counter|session|track)|\bstate\b)",
 }
 
 

@@ -1,0 +1,34 @@
+{
+  "id": "bug-tmpl-escape",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-tmpl-escape/snapshot",
+    "sha256": "02a921e121cdc254b2f2cb29e206671d7d731c81a8fc9f96358c70951163610e"
+  },
+  "task": {
+    "instruction": "Fix render(template, values) in solution.py: {{ and }} escape to a literal single brace, {name} substitutes from values, and a missing key keeps its placeholder written out instead of being invalid. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-tmpl-escape/verifiers/test_t.py"
+    ],
+    "command": "{python} -m pytest {verify}test_t.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard",
+    "family": "templating",
+    "cell_api": "fix"
+  }
+}

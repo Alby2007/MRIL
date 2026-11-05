@@ -1,0 +1,34 @@
+{
+  "id": "bug-serde-fields",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-serde-fields/snapshot",
+    "sha256": "894c5ffeb9837a9a4da90a012092007dee6de52b0684a9f95cd39d4242b208c6"
+  },
+  "task": {
+    "instruction": "The record helpers in solution.py lose a field on the way to a dict and back: repair them so person_to_dict then dict_to_person gives back an equivalent record. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-serde-fields/verifiers/test_s.py"
+    ],
+    "command": "{python} -m pytest {verify}test_s.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium",
+    "family": "serialization",
+    "cell_api": "class"
+  }
+}

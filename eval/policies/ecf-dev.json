@@ -21,16 +21,20 @@
       12.0
     ],
     "feat:rule_markers=": [
-      30.0,
+      18.0,
       0.0
     ],
-    "feat:rule_markers=edge_cases+numeric": [
+    "feat:rule_markers=edge_cases+numeric+quoting": [
       0.0,
       3.0
     ],
     "feat:rule_markers=numeric": [
       0.0,
       3.0
+    ],
+    "feat:rule_markers=ordering": [
+      6.0,
+      0.0
     ],
     "feat:rule_markers=ordering+quoting": [
       0.0,
@@ -41,7 +45,7 @@
       3.0
     ],
     "feat:rule_markers=stateful": [
-      3.0,
+      9.0,
       0.0
     ],
     "feat:scope=single_file": [
@@ -72,11 +76,19 @@
       0.0,
       3.0
     ],
-    "sig:api_kind=class|category=feature|rule_markers=|scope=single_module|spec_clauses=many": [
+    "sig:api_kind=class|category=feature|rule_markers=stateful|scope=single_module|spec_clauses=many": [
+      3.0,
+      0.0
+    ],
+    "sig:api_kind=fix|category=bug_fix|rule_markers=ordering|scope=single_module|spec_clauses=many": [
       3.0,
       0.0
     ],
     "sig:api_kind=fix|category=bug_fix|rule_markers=stateful|scope=single_file|spec_clauses=few": [
+      3.0,
+      0.0
+    ],
+    "sig:api_kind=fix|category=bug_fix|rule_markers=stateful|scope=single_file|spec_clauses=many": [
       3.0,
       0.0
     ],
@@ -85,14 +97,14 @@
       0.0
     ],
     "sig:api_kind=fix|category=bug_fix|rule_markers=|scope=single_file|spec_clauses=many": [
-      6.0,
+      3.0,
       0.0
     ],
     "sig:api_kind=fix|category=bug_fix|rule_markers=|scope=single_module|spec_clauses=many": [
-      6.0,
+      3.0,
       0.0
     ],
-    "sig:api_kind=function|category=feature|rule_markers=edge_cases+numeric|scope=single_module|spec_clauses=many": [
+    "sig:api_kind=function|category=feature|rule_markers=edge_cases+numeric+quoting|scope=single_module|spec_clauses=many": [
       0.0,
       3.0
     ],
@@ -100,13 +112,13 @@
       0.0,
       3.0
     ],
+    "sig:api_kind=function|category=feature|rule_markers=ordering|scope=single_file|spec_clauses=few": [
+      3.0,
+      0.0
+    ],
     "sig:api_kind=function|category=feature|rule_markers=quoting|scope=single_module|spec_clauses=many": [
       0.0,
       3.0
-    ],
-    "sig:api_kind=function|category=feature|rule_markers=|scope=single_file|spec_clauses=few": [
-      3.0,
-      0.0
     ],
     "sig:api_kind=function|category=feature|rule_markers=|scope=single_file|spec_clauses=many": [
       6.0,
@@ -115,21 +127,21 @@
   },
   "cost_model": {
     "c_handoff": 0.00061125,
-    "c_strong_after_fail": 0.007494583333333333,
+    "c_strong_after_fail": 0.0074800000000000005,
     "c_strong_fresh": 0.0034733333333333335,
     "c_weak": 6.308e-05,
-    "lat_strong_ms": 5243.571422222222,
-    "lat_weak_ms": 741.4454844444444,
+    "lat_strong_ms": 5216.817163492064,
+    "lat_weak_ms": 759.6051555555556,
     "q_fresh": 0.8624999999999999,
     "q_recovery": 0.56
   },
   "epsilon": 0.0,
   "fallback": "cheap",
-  "feature_version": "1",
+  "feature_version": "2",
   "prior_strength": 3.0,
   "quality_margin": 0.05,
-  "snapshot_hash": "972803350f050723",
-  "trained_from_ledger": "eval/runs/study-03-train/eval.db",
+  "snapshot_hash": "636becc227b4b42a",
+  "trained_from_ledger": "eval/runs/study-03-train-v2/eval.db",
   "trained_on_runs": 90,
   "version": "1"
 }

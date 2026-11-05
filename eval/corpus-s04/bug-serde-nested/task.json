@@ -1,0 +1,34 @@
+{
+  "id": "bug-serde-nested",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-serde-nested/snapshot",
+    "sha256": "b3c887bc4ecebb211955dc16b4d2783e1104575a657e16420c0b1a3e5d739683"
+  },
+  "task": {
+    "instruction": "The serializer helpers in solution.py are broken: repair them so nested Item records become dicts, fields holding None or missing from the output stay out, and a full round trip reproduces the record. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-serde-nested/verifiers/test_s.py"
+    ],
+    "command": "{python} -m pytest {verify}test_s.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard",
+    "family": "serialization",
+    "cell_api": "class"
+  }
+}

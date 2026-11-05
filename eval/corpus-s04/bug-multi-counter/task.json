@@ -1,0 +1,34 @@
+{
+  "id": "bug-multi-counter",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-multi-counter/snapshot",
+    "sha256": "19dd2ef7f3064f0177e6023d34c3b8cd21f9d3393d585149029e7e3c4b437344"
+  },
+  "task": {
+    "instruction": "Fix WordCounter in solution.py: add(word) tallies words and top() gives back the most frequent one; an empty counter gives back None. Right now top() returns the first word ever added. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-multi-counter/verifiers/test_m.py"
+    ],
+    "command": "{python} -m pytest {verify}test_m.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard",
+    "family": "multi_function",
+    "cell_api": "class"
+  }
+}

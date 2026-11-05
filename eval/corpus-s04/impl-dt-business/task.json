@@ -1,0 +1,34 @@
+{
+  "id": "impl-dt-business",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-dt-business/snapshot",
+    "sha256": "c98f994568fb4ba1085b46b66767ffacca065f07a599c63eb756ad6bc1102aa8"
+  },
+  "task": {
+    "instruction": "Implement business_days(start, end, holidays) in solution.py: count Mon-Fri days between two ISO date strings, inclusive of start but excluding end; holiday strings are skipped; an invalid date string raises ValueError; when start is after end the count is a negative int of the reversed span. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-dt-business/verifiers/test_d.py"
+    ],
+    "command": "{python} -m pytest {verify}test_d.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard",
+    "family": "datetime",
+    "cell_api": "function"
+  }
+}

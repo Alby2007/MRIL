@@ -1,0 +1,34 @@
+{
+  "id": "impl-serde-basic",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-serde-basic/snapshot",
+    "sha256": "726221a8442b106a8e4f7d81e69b32f6406e5cadffb7410c4f58894878b51978"
+  },
+  "task": {
+    "instruction": "Implement product_to_dict(p) and dict_to_product(d) in solution.py for the Product class provided: give back a dict with the same fields going each way so a record survives the trip there and back. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-serde-basic/verifiers/test_s.py"
+    ],
+    "command": "{python} -m pytest {verify}test_s.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium",
+    "family": "serialization",
+    "cell_api": "class"
+  }
+}

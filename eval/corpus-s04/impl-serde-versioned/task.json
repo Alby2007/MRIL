@@ -1,0 +1,34 @@
+{
+  "id": "impl-serde-versioned",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-serde-versioned/snapshot",
+    "sha256": "23aee606e245faccde1e82439c1cd0ecd83515be014b328367e0e51a5fedca68"
+  },
+  "task": {
+    "instruction": "Implement serialize(e) and deserialize(d) in solution.py: serialize gives back a dict tagged {'v': 2}; fields holding None or missing stay out; qty is coerced to int; deserialize rebuilds the Entry and raises ValueError on any unknown key. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-serde-versioned/verifiers/test_s.py"
+    ],
+    "command": "{python} -m pytest {verify}test_s.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard",
+    "family": "serialization",
+    "cell_api": "class"
+  }
+}

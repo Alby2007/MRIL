@@ -29,7 +29,7 @@ from mril.core.events import (
     VerificationStatus,
 )
 from mril.policy.empirical import SNAPSHOT_VERSION, PolicySnapshot
-from mril.policy.features import TaskFeatures
+from mril.policy.features import FEATURE_VERSION, TaskFeatures
 from mril.store.sqlite import SQLiteEventStore
 
 
@@ -165,7 +165,7 @@ def fit(
     prior_strength: float = 3.0,
     quality_margin: float = 0.05,
     epsilon: float = 0.0,
-    feature_version: str = "1",
+    feature_version: str = FEATURE_VERSION,
 ) -> PolicySnapshot:
     obs = collect(store_path, weak_id, strong_id)
 

@@ -1,0 +1,34 @@
+{
+  "id": "bug-validate-order",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-validate-order/snapshot",
+    "sha256": "bcdc4608f5d2591d6f490f50b9ddc27c93d99c7ddc57e647804df44bdd1ba18d"
+  },
+  "task": {
+    "instruction": "Fix validate_order(quantity, price, status) in solution.py: quantity must be a positive int, price at least 0, and status one of the allowed labels; anything else is invalid and raises ValueError. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-validate-order/verifiers/test_v.py"
+    ],
+    "command": "{python} -m pytest {verify}test_v.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard",
+    "family": "api_validation",
+    "cell_api": "fix"
+  }
+}

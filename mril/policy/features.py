@@ -14,7 +14,10 @@ from dataclasses import dataclass
 
 from mril.core.task import TaskContext
 
-FEATURE_VERSION = "1"
+# v2: rule-marker patterns use word-prefix matching — "\bpars\b" never fired
+# on "parse"/"parser", silently emptying the quoting bucket. Schema change:
+# any snapshot trained under v1 must be retrained before reuse.
+FEATURE_VERSION = "2"
 
 _KEYS = ("category", "scope", "api_kind", "spec_clauses", "rule_markers")
 
