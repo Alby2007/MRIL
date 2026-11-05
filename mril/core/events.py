@@ -63,6 +63,7 @@ class Event:
     trace_id: str | None = None
     step_index: int | None = None
     call_site: str | None = None
+    dedupe_key: str | None = None  # logical identity; stores reject repeats of it
     schema_version: str = SCHEMA_VERSION
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -139,6 +140,7 @@ class ModelInvocationFinished(Event):
     latency_ms: float | None = None
     cost_usd: float | None = None
     api_error: str | None = None
+    provider_request_id: str | None = None  # upstream's own identity, if known
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -162,8 +164,17 @@ class RecoveryDecided(Event):
     action: str = "continue"  # continue | retry | escalate | stop
     model_id: str | None = None
     reason: str = ""
-    estimated_cost_usd: float | None = None
+    estimated_cost_usd: float | None = None  # switch + expected attempt, total
+    estimated_switch_cost_usd: float | None = None  # the KV-cache rewrite part
+    context_tokens: int | None = None  # state.context_tokens the estimate priced
     budget_remaining_usd: float | None = None
+    # Propensity of the action taken under the emitting policy: 1.0 while
+    # policies are deterministic; a stochastic recovery policy logs its real
+    # draw probability so recovery decisions stay off-policy evaluable.
+    selection_probability: float = 1.0
+    # Decision-time inputs (RecoveryContext.to_dict()) — what the policy saw,
+    # never future outcomes. Lets recovery decisions be replayed offline.
+    recovery_context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -177,3 +188,9 @@ class TaskFinalized(Event):
     elapsed_ms: float | None = None
     attempt_count: int = 0
     escalation_count: int = 0
+    # Re-ingestion spend attributable to model switches, summed over
+    # escalations. basis: measured (provider reported cache usage for every
+    # switch), estimated (none did — priced from recorded context_tokens),
+    # mixed. Never label an estimate "measured".
+    actual_switch_cost_usd: float | None = None
+    switch_cost_basis: str | None = None

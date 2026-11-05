@@ -81,3 +81,43 @@ owner of execution: the harness. See [06](06-harness-integration.md).
 architecture. The module boundaries (`core`/`policy`/`store`/`adapters`)
 already enforce the dependency rules; physical split happens when a second
 implementation actually needs it.
+
+## ADR-008 — Logical idempotency alongside event idempotency
+
+`event_id` dedupes *writes*; `dedupe_key` dedupes *occurrences*. Every
+observation type carries an SDK-assigned logical key (verification run ids,
+provider-namespaced request ids, attempt/step/call-site triples), and
+recovery is deduped at an action-independent *checkpoint* — first committed
+decision wins, racing callers get the recorded action back.
+
+*Why:* a retried write that mints a fresh UUID would otherwise double-count
+cost and inflate `escalation_count`; an action-keyed recovery dedupe would
+let two concurrent evaluations both persist. Checkpoint semantics are what
+make a future stochastic recovery policy single-draw.
+
+## ADR-009 — Measured means measured
+
+The ledger never labels an estimate as observed. `recovery_decided` splits
+`estimated_switch_cost_usd` from the attempt estimate; `task_finalized`
+reports `actual_switch_cost_usd` with `switch_cost_basis` — `measured` only
+when the post-switch call carried provider cache-usage data.
+
+*And the finer point:* measured post-switch fresh-input spend is the
+billed re-ingest, **not** the incremental cost of switching — establishing
+that needs the counterfactual (staying on the original model). Analytics
+and reports keep the distinction: we show re-ingest spend, honest basis
+labels, and `synthetic_token_price` for local inference — never billed
+money, never implied savings.
+
+## ADR-010 — Evaluation before learning
+
+No learned policy until the eval harness can replay the decisions it would
+replace. v0.2 is the measurement system: immutable corpora, interchangeable
+policy arms behind one strategy contract, guardrailed comparison (min cost
+s.t. completion within δ of the ceiling arm), and `RecoveryContext`
+snapshotted on every recovery decision so policies can be replayed offline.
+
+*Why:* routing intelligence that can't demonstrate economic value is a
+wrapper, not infrastructure. A rigorous negative result is a fine v0.2
+outcome — the instrument is the deliverable; learning earns its complexity
+against it.

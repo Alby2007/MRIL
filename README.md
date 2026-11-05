@@ -62,11 +62,14 @@ per-call routing can be adopted without re-instrumenting adapters.
 ```
 mril/
   core/      events, models/registry, task context, decisions — zero I/O
-  policy/    policy interface, TaskState replay, TieredPolicy (v0.1 rules)
+  policy/    policy interface, TaskState replay, TieredPolicy (v0.1 rules),
+             RecoveryContext decision snapshots
   store/     EventStore protocol; SQLite + in-memory implementations
   adapters/  harness integrations (langchain middleware; duck-typed)
+  eval/      reproducible evaluation: immutable corpus, policy arms,
+             isolated workspaces, guardrailed reports
   telemetry/ aggregate summaries over the ledger
-  cli.py     mril explain / task / tasks
+  cli.py     mril explain / task / tasks / eval
 examples/    runnable flows
 tests/
 ```
@@ -93,8 +96,12 @@ mril --db langgraph.db task palindrome-1
 
 ## Roadmap
 
-- **M1 (here)**: event contract, ledger, deterministic tiered routing,
+- **M1**: event contract, ledger, deterministic tiered routing,
   recovery with switching-cost model, LangChain middleware, explain CLI.
+- **v0.2 (here)**: ledger hardening (logical idempotency, measured-vs-
+  estimated switch cost, recovery checkpoints + context snapshots) and the
+  evaluation harness — immutable corpora, three policy arms, guardrailed
+  reports. Remaining: the 30–50 task corpus + real capability-gap models.
 - M2: richer LangGraph/Deep Agents checkpoint integration, verification
   ingestion from real test runners.
 - M3: offline policy evaluation over the ledger (IPS/DR using logged

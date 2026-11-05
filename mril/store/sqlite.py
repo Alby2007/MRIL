@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS events (
     task_id     TEXT,
     attempt_id  TEXT,
     decision_id TEXT,
+    dedupe_key  TEXT,
     occurred_at TEXT NOT NULL,
     payload     TEXT NOT NULL
 );
@@ -38,6 +39,16 @@ class SQLiteEventStore:
         self._lock = threading.Lock()
         with self._conn:
             self._conn.executescript(_SCHEMA)
+            self._migrate()
+
+    def _migrate(self) -> None:
+        cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(events)")}
+        if "dedupe_key" not in cols:
+            self._conn.execute("ALTER TABLE events ADD COLUMN dedupe_key TEXT")
+        self._conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedupe "
+            "ON events(dedupe_key)"
+        )
 
     def append(self, event: Event) -> bool:
         payload = json.dumps(event.to_dict(), sort_keys=True)
@@ -47,14 +58,16 @@ class SQLiteEventStore:
             event.task_id,
             event.attempt_id,
             event.decision_id,
+            event.dedupe_key,
             event.occurred_at,
             payload,
         )
         with self._lock, self._conn:
             cur = self._conn.execute(
                 "INSERT OR IGNORE INTO events "
-                "(event_id, event_type, task_id, attempt_id, decision_id, occurred_at, payload) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "(event_id, event_type, task_id, attempt_id, decision_id, "
+                "dedupe_key, occurred_at, payload) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 row,
             )
             return cur.rowcount == 1

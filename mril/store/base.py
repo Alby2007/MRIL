@@ -10,7 +10,8 @@ from mril.core.events import Event
 class EventStore(Protocol):
     def append(self, event: Event) -> bool:
         """Append an event. Returns False if the event_id already exists
-        (idempotent retry), True on first write."""
+        (idempotent retry) or if the event's dedupe_key was already written
+        (same logical occurrence retried with a fresh event_id)."""
         ...
 
     def get(self, event_id: str) -> Event | None: ...

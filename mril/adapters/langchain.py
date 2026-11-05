@@ -119,6 +119,7 @@ class MRILMiddleware(_Base):
         verifier_type: str = "test",
         failure_category: str | None = None,
         task_id: str | None = None,
+        verification_run_id: str | None = None,
     ) -> None:
         status = (
             VerificationStatus.PASSED
@@ -133,6 +134,7 @@ class MRILMiddleware(_Base):
             task_id=task_id,
             verifier_type=verifier_type,
             failure_category=failure_category,
+            verification_run_id=verification_run_id,
         )
 
     # -- internals --------------------------------------------------------------

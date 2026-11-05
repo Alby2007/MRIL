@@ -39,12 +39,16 @@ Choose a model. Emits `task_started` (once per task) and `route_decided`.
 Never raises for policy failures: on any exception it selects the fallback
 model and marks `degraded=True` (recorded in the ledger too).
 
-## `observe_invocation(decision_id, model_id, *, task_id=?, attempt_id=?, input_tokens=?, output_tokens=?, cached_input_tokens=?, latency_ms=?, cost_usd=?, api_error=?, ...) -> ModelInvocationFinished`
+## `observe_invocation(decision_id, model_id, *, task_id=?, attempt_id=?, input_tokens=?, output_tokens=?, cached_input_tokens=?, latency_ms=?, cost_usd=?, api_error=?, provider_request_id=?, ...) -> ModelInvocationFinished`
 
 Record one model call. If `cost_usd` is omitted and token counts are present,
 cost is computed from the **price snapshot frozen into that decision's
 `route_decided` event** — so provider re-pricing can't corrupt the books.
 `attempt_id` auto-generates if omitted (adapters pass a shared one per run).
+
+Repeat calls dedupe on logical identity: `provider_request_id` when given,
+else `(attempt_id, step_index, call_site)` — with neither, no dedupe (a bare
+attempt can host several calls).
 
 ## `observe_verification(attempt_id, status, *, task_id=?, verifier_type="unknown", confidence=?, failure_category=?, step_index=?) -> VerificationCompleted`
 
@@ -57,8 +61,12 @@ Record verifier evidence. `status ∈ passed | failed | inconclusive`.
 
 Replays the ledger and asks the policy how to proceed. Emits
 `recovery_decided`. Returns `RecoveryAction{type, model_id?, reason,
-estimated_cost_usd?, budget_remaining_usd?}` where `type ∈ continue | retry |
+estimated_cost_usd?, estimated_switch_cost_usd?, context_tokens?,
+budget_remaining_usd?}` where `type ∈ continue | retry |
 escalate | stop`. Policy errors degrade to `continue`, never raise.
+
+Idempotent on unchanged state: repeat calls return the same action but write
+one `recovery_decided` — escalation counts can't be inflated by a retry.
 
 ## `finalize(task_id, outcome=None) -> TaskFinalized`
 
@@ -66,6 +74,10 @@ Record the terminal outcome. If `outcome` is omitted it's derived from the
 last attempt's verification: passed → `verified_success`, failed →
 `verified_failure`, anything else → `inconclusive`. **Missing verification
 can never become success.**
+
+Also records `actual_switch_cost_usd` + `switch_cost_basis`
+(measured | estimated | mixed | null) — the re-ingest spend attributable to
+escalations. One verdict per task: repeat calls return the stored event.
 
 ## `task_state(task_id) -> TaskState`
 

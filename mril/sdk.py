@@ -34,6 +34,7 @@ from mril.core.events import (
 from mril.core.models import ModelRegistry
 from mril.core.task import RoutingConstraints, TaskContext
 from mril.policy.base import RoutingPolicy
+from mril.policy.recovery_context import RecoveryContext
 from mril.policy.state import TaskState, rebuild_state
 from mril.policy.tiered import TieredPolicy
 from mril.store.base import EventStore
@@ -143,6 +144,7 @@ class Router:
         latency_ms: float | None = None,
         cost_usd: float | None = None,
         api_error: str | None = None,
+        provider_request_id: str | None = None,
         step_index: int | None = None,
         call_site: str | None = None,
     ) -> ModelInvocationFinished:
@@ -150,9 +152,22 @@ class Router:
             cost_usd = self._compute_cost(
                 decision_id, model_id, input_tokens, output_tokens, cached_input_tokens or 0
             )
+        attempt_id = attempt_id or new_event_id()
+        # Logical identity: the provider's own request id when known —
+        # namespaced by provider since request ids aren't globally unique —
+        # else (attempt, step, call_site). With neither, no dedupe: a bare
+        # attempt_id can host several distinct calls and must not collapse them.
+        if provider_request_id:
+            spec = self.registry.get(model_id)
+            ns = (spec.provider or spec.model_id) if spec else model_id
+            dedupe_key = f"inv:req:{ns}:{provider_request_id}"
+        elif step_index is not None or call_site is not None:
+            dedupe_key = f"inv:{attempt_id}:{step_index}:{call_site}"
+        else:
+            dedupe_key = None
         event = ModelInvocationFinished(
             task_id=task_id,
-            attempt_id=attempt_id or new_event_id(),
+            attempt_id=attempt_id,
             decision_id=decision_id,
             model_id=model_id,
             input_tokens=input_tokens,
@@ -161,8 +176,10 @@ class Router:
             latency_ms=latency_ms,
             cost_usd=cost_usd,
             api_error=api_error,
+            provider_request_id=provider_request_id,
             step_index=step_index,
             call_site=call_site,
+            dedupe_key=dedupe_key,
         )
         self.store.append(event)
         return event
@@ -176,16 +193,28 @@ class Router:
         verifier_type: str = "unknown",
         confidence: float | None = None,
         failure_category: str | None = None,
+        verification_run_id: str | None = None,
         step_index: int | None = None,
     ) -> VerificationCompleted:
+        status = VerificationStatus(status)
+        # Each verifier *execution* gets a stable run id from the harness;
+        # retries of that execution dedupe, distinct runs never collapse —
+        # even when they return the same verdict. Without a run id the key
+        # falls back to observation content (approximate, documented).
+        dedupe_key = (
+            f"ver:run:{verification_run_id}"
+            if verification_run_id
+            else f"ver:{attempt_id}:{verifier_type}:{status.value}:{failure_category}:{step_index}"
+        )
         event = VerificationCompleted(
             task_id=task_id,
             attempt_id=attempt_id,
-            status=VerificationStatus(status),
+            status=status,
             verifier_type=verifier_type,
             confidence=confidence,
             failure_category=failure_category,
             step_index=step_index,
+            dedupe_key=dedupe_key,
         )
         self.store.append(event)
         return event
@@ -197,28 +226,62 @@ class Router:
     ) -> RecoveryAction:
         constraints = constraints or self.default_constraints
         state = self._state(task_id)
+        rctx = RecoveryContext.from_state(state, constraints, self.registry)
         try:
             action = self.policy.recover(state, constraints, self.registry)
         except Exception as exc:
             action = RecoveryAction(RecoveryType.CONTINUE, reason=f"recovery error: {exc}")
-        self.store.append(
-            RecoveryDecided(
-                task_id=task_id,
-                action=action.type.value,
-                model_id=action.model_id,
-                reason=action.reason,
-                estimated_cost_usd=action.estimated_cost_usd,
-                budget_remaining_usd=action.budget_remaining_usd,
-            )
+        # A recovery *checkpoint* is identified by the state at decision time,
+        # never by the action chosen. First committed decision wins: a repeat
+        # or racing call on unchanged state gets the recorded action back —
+        # this is what keeps a stochastic recovery policy single-draw.
+        last = state.last_attempt
+        dedupe_key = (
+            f"rec:{task_id}:{len(state.attempts)}:{last.attempt_id if last else '-'}"
         )
+        event = RecoveryDecided(
+            task_id=task_id,
+            action=action.type.value,
+            model_id=action.model_id,
+            reason=action.reason,
+            estimated_cost_usd=action.estimated_cost_usd,
+            estimated_switch_cost_usd=action.estimated_switch_cost_usd,
+            context_tokens=action.context_tokens,
+            budget_remaining_usd=action.budget_remaining_usd,
+            selection_probability=action.probability,
+            recovery_context=rctx.to_dict(),
+            dedupe_key=dedupe_key,
+        )
+        if not self.store.append(event):
+            stored = next(
+                (
+                    e
+                    for e in reversed(self.store.events_for_task(task_id))
+                    if isinstance(e, RecoveryDecided) and e.dedupe_key == dedupe_key
+                ),
+                None,
+            )
+            if stored is not None:
+                return RecoveryAction(
+                    RecoveryType(stored.action),
+                    model_id=stored.model_id,
+                    reason=stored.reason,
+                    estimated_cost_usd=stored.estimated_cost_usd,
+                    estimated_switch_cost_usd=stored.estimated_switch_cost_usd,
+                    context_tokens=stored.context_tokens,
+                    budget_remaining_usd=stored.budget_remaining_usd,
+                    probability=stored.selection_probability,
+                )
         return action
 
     # ---------------------------------------------------------------- finalize
 
     def finalize(self, task_id: str, outcome: TaskOutcome | str | None = None) -> TaskFinalized:
-        state = self._state(task_id)
+        events = self.store.events_for_task(task_id)
+        state = rebuild_state(task_id, events)
         if outcome is None:
             outcome = self._derive_outcome(state)
+        switch_cost, switch_basis = self._switch_cost(events)
         event = TaskFinalized(
             task_id=task_id,
             task_outcome=TaskOutcome(outcome),
@@ -226,8 +289,17 @@ class Router:
             elapsed_ms=self._elapsed_ms(task_id),
             attempt_count=len(state.attempts),
             escalation_count=state.escalation_count,
+            actual_switch_cost_usd=switch_cost,
+            switch_cost_basis=switch_basis,
+            dedupe_key=f"fin:{task_id}",
         )
-        self.store.append(event)
+        if not self.store.append(event):
+            # already finalized — return the recorded verdict, not a phantom
+            stored = next(
+                (e for e in reversed(events) if isinstance(e, TaskFinalized)), None
+            )
+            if stored is not None:
+                return stored
         return event
 
     # ------------------------------------------------------------------ state
@@ -253,6 +325,7 @@ class Router:
                 risk=ctx.risk,
                 harness=ctx.harness,
                 metadata=dict(ctx.metadata),
+                dedupe_key=f"ts:{ctx.task_id}",  # race-safe even if check loses
             )
         )
 
@@ -295,6 +368,57 @@ class Router:
         if spec:
             return spec.cost_usd(input_tokens, output_tokens, cached_input_tokens)
         return None
+
+    def _snapshot_input_price(self, decision_id: str | None, model_id: str) -> float | None:
+        """Decision-time input price for a model: the RouteDecided snapshot
+        first, live registry as a fallback."""
+        if decision_id:
+            for e in self.store.events_for_decision(decision_id):
+                if isinstance(e, RouteDecided):
+                    snap = e.price_snapshot.get(model_id)
+                    if snap and snap.get("input_price") is not None:
+                        return snap["input_price"]
+        spec = self.registry.get(model_id)
+        return spec.input_price if spec else None
+
+    def _switch_cost(self, events: list) -> tuple[float | None, str | None]:
+        """Re-ingestion spend attributable to model switches, per escalation.
+
+        For each escalate decision, the first subsequent invocation is the
+        post-switch call. When the provider reported cached_input_tokens on it,
+        the fresh-input share IS the billed re-ingest ("measured"). When cache
+        usage is unobservable, the prior warm context is priced at the new
+        model's input price ("estimated") — never labelled measured.
+        """
+        esc_idx = [
+            i for i, e in enumerate(events)
+            if isinstance(e, RecoveryDecided) and e.action == "escalate" and e.model_id
+        ]
+        if not esc_idx:
+            return None, None
+        invs = [(i, e) for i, e in enumerate(events) if isinstance(e, ModelInvocationFinished)]
+        total, bases = 0.0, []
+        for idx in esc_idx:
+            prev = next((e for i, e in reversed(invs) if i < idx), None)
+            nxt = next((e for i, e in invs if i > idx), None)
+            if nxt is None or (prev and nxt.model_id == prev.model_id):
+                continue  # no switch actually happened
+            price = self._snapshot_input_price(nxt.decision_id, nxt.model_id or "")
+            if price is None:
+                continue
+            if nxt.input_tokens is not None and nxt.cached_input_tokens is not None:
+                total += (nxt.input_tokens - nxt.cached_input_tokens) * price / 1e6
+                bases.append("measured")
+            else:
+                warm = max(
+                    (e.input_tokens or 0 for i, e in invs if i < idx), default=0
+                )
+                total += warm * price / 1e6
+                bases.append("estimated")
+        if not bases:
+            return None, None
+        basis = bases[0] if len(set(bases)) == 1 else "mixed"
+        return total, basis
 
     def _derive_outcome(self, state: TaskState) -> TaskOutcome:
         last = state.last_attempt

@@ -42,9 +42,10 @@ any intelligence does.
 2. Pick the cheapest candidate (by expected blended cost for the scope's
    typical token counts) at or above that tier. If none qualify, take the
    cheapest eligible and say so in the reason.
-3. Optional `epsilon` exploration picks uniformly at random instead —
-   seeded, and the logged `selection_probability` reflects the mixture
-   (needed later for unbiased offline evaluation).
+3. Optional `epsilon` exploration: every candidate carries `eps/n` of the
+   probability mass and the greedy arm carries the rest — the logged
+   `selection_probability` is the *marginal* propensity of the arm taken
+   (greedy: `1-eps + eps/n`), so offline IPS weights stay unbiased.
 
 ### Recovery — where the interesting logic lives
 
@@ -90,6 +91,11 @@ exists, fall back to retry/stop per remaining attempts.
   input_price`; no cache credit, since the cache can't move.
 - Decision estimates use a small per-scope token-expectation table —
   labeled as estimates, never mixed with measured usage.
+- `recovery_decided` decomposes its estimate: `estimated_switch_cost_usd`
+  (cache rewrite) vs `estimated_cost_usd` (rewrite + expected attempt).
+- `task_finalized` reports `actual_switch_cost_usd` with `switch_cost_basis`
+  — `measured` only when the post-switch call carried provider cache usage;
+  otherwise `estimated`, never mislabeled.
 - **Measured** costs come from provider-reported usage, or from the frozen
   price snapshot — never from live registry prices.
 

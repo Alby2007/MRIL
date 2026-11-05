@@ -16,6 +16,31 @@ world: `after_agent` fired per-invoke and closed tasks early; "attempt"
 counted model calls instead of agent runs; Ollama mangles tool args. All
 fixed and documented — see [06](06-harness-integration.md).
 
+## v0.2 — Empirical validation `[building]`
+
+Ledger hardening landed first: logical idempotency (`dedupe_key` per event
+type — invocation steps, verification run ids, recovery checkpoints,
+single-finalize), measured-vs-estimated switch-cost accounting
+(`actual_switch_cost_usd` + `switch_cost_basis`), marginal-propensity
+logging, and the `RecoveryContext` decision-time snapshot that makes
+recovery decisions independently replayable.
+
+The evaluation harness (`mril/eval/`) is scaffolded and tested: immutable
+JSON task specs with sha256-pinned snapshots, per-run workspace
+materialization, hidden verifiers restaged each run, three interchangeable
+arms (strongest-only / cheap-first / mril-tiered) behind one strategy
+contract, ledger-derived results, and a guardrailed report — min cost
+subject to verified-completion within δ of the ceiling arm. Local cost
+figures are labeled `synthetic_token_price`, never billed money.
+
+Exit criteria: same task across all arms `[met in tests]` · real capability
+gap `[pending: needs distinct-size Ollama models]` · fresh state per run
+`[met]` · agent can't touch the verifier `[met — tests run in a workspace
+copy, never beside the agent]` · all
+calls in ledger `[met]` · replay from manifest `[met]` · report covers
+quality+spend+latency `[met]`. The corpus itself — 30–50 varied tasks — is
+the remaining work, and a rigorous negative result still counts.
+
 ## M2 — Working coding-agent integration `[next]`
 
 - **Feature provenance.** `feature_extractor` currently returns declared or

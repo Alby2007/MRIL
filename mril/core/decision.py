@@ -48,5 +48,8 @@ class RecoveryAction:
     type: RecoveryType
     model_id: str | None = None
     reason: str = ""
-    estimated_cost_usd: float | None = None
+    estimated_cost_usd: float | None = None  # switch + expected attempt, total
+    estimated_switch_cost_usd: float | None = None
+    context_tokens: int | None = None
     budget_remaining_usd: float | None = None
+    probability: float = 1.0  # propensity under the emitting policy

@@ -83,15 +83,6 @@ class TieredPolicy:
             raise ValueError("no eligible models after constraints")
 
         n = len(candidates)
-        if self.epsilon > 0 and rng.random() < self.epsilon:
-            pick = candidates[rng.randrange(n)]
-            return PolicySelection(
-                model_id=pick.model_id,
-                probability=self.epsilon / n,
-                reason=f"epsilon-exploration (eps={self.epsilon})",
-                estimated_cost_usd=self._estimate(pick, ctx.scope),
-            )
-
         minimum = _min_tier(ctx.scope, ctx.risk)
         eligible = [m for m in candidates if tier_index(m.tier) >= tier_index(minimum)]
         pool = eligible if eligible else list(candidates)
@@ -100,11 +91,32 @@ class TieredPolicy:
             if eligible
             else f"no candidate meets min_tier={minimum}; cheapest allowed"
         )
-        pick = min(pool, key=lambda m: (_blended_price(m, ctx.scope), m.model_id))
-        prob = 1.0 - self.epsilon if self.epsilon > 0 else 1.0
+        greedy = min(pool, key=lambda m: (_blended_price(m, ctx.scope), m.model_id))
+        if self.epsilon <= 0:
+            return PolicySelection(
+                model_id=greedy.model_id,
+                probability=1.0,
+                reason=reason,
+                estimated_cost_usd=self._estimate(greedy, ctx.scope),
+            )
+
+        # Seeded eps-greedy: every candidate carries eps/n of the mass and the
+        # greedy arm carries the remaining 1-eps. The logged probability is the
+        # *marginal* propensity of the arm actually taken — exploration mass on
+        # the greedy arm included — so off-policy weights stay unbiased.
+        probs = {m.model_id: self.epsilon / n for m in candidates}
+        probs[greedy.model_id] += 1.0 - self.epsilon
+        pick, acc, r = greedy, 0.0, rng.random()
+        for m in candidates:
+            acc += probs[m.model_id]
+            if r < acc:
+                pick = m
+                break
+        if pick.model_id != greedy.model_id:
+            reason = f"epsilon-exploration (eps={self.epsilon})"
         return PolicySelection(
             model_id=pick.model_id,
-            probability=prob,
+            probability=probs[pick.model_id],
             reason=reason,
             estimated_cost_usd=self._estimate(pick, ctx.scope),
         )
@@ -119,67 +131,63 @@ class TieredPolicy:
     ) -> RecoveryAction:
         budget = constraints.budget_usd
         remaining = (budget - state.total_cost_usd) if budget is not None else None
+        ctx_tokens = state.context_tokens
+        kw = {"context_tokens": ctx_tokens, "budget_remaining_usd": remaining}
         if state.finalized:
-            return RecoveryAction(RecoveryType.STOP, reason="task already finalized",
-                                  budget_remaining_usd=remaining)
+            return RecoveryAction(RecoveryType.STOP, reason="task already finalized", **kw)
         if remaining is not None and remaining <= 0:
-            return RecoveryAction(RecoveryType.STOP, reason="budget exhausted",
-                                  budget_remaining_usd=remaining)
+            return RecoveryAction(RecoveryType.STOP, reason="budget exhausted", **kw)
 
         last = state.last_attempt
         if last is None:
-            return RecoveryAction(RecoveryType.CONTINUE, reason="no attempts yet",
-                                  budget_remaining_usd=remaining)
+            return RecoveryAction(RecoveryType.CONTINUE, reason="no attempts yet", **kw)
         if len(state.attempts) >= constraints.max_attempts:
             return RecoveryAction(
                 RecoveryType.STOP,
                 reason=f"max attempts reached ({constraints.max_attempts})",
-                budget_remaining_usd=remaining,
+                **kw,
             )
         if last.api_error:
             return RecoveryAction(RecoveryType.RETRY, model_id=last.model_id,
-                                  reason=f"provider error: {last.api_error}",
-                                  budget_remaining_usd=remaining)
+                                  reason=f"provider error: {last.api_error}", **kw)
         if last.verification_status == "passed":
-            return RecoveryAction(RecoveryType.CONTINUE, reason="verification passed",
-                                  budget_remaining_usd=remaining)
+            return RecoveryAction(RecoveryType.CONTINUE, reason="verification passed", **kw)
         if last.verification_status in (None, "inconclusive"):
             return RecoveryAction(RecoveryType.CONTINUE,
-                                  reason="no conclusive verification yet",
-                                  budget_remaining_usd=remaining)
+                                  reason="no conclusive verification yet", **kw)
 
         # verification failed
         if last.failure_category in self.retryable_failures:
             return RecoveryAction(RecoveryType.RETRY, model_id=last.model_id,
-                                  reason=f"retryable failure: {last.failure_category}",
-                                  budget_remaining_usd=remaining)
+                                  reason=f"retryable failure: {last.failure_category}", **kw)
 
         # capability failure — try to escalate, pricing in the cache rewrite
         target = self._escalation_target(state, constraints, registry)
         if target is None:
             if len(state.attempts) + 1 < constraints.max_attempts:
                 return RecoveryAction(RecoveryType.RETRY, model_id=last.model_id,
-                                      reason="no higher-tier candidate available",
-                                      budget_remaining_usd=remaining)
-            return RecoveryAction(RecoveryType.STOP, reason="no escalation path",
-                                  budget_remaining_usd=remaining)
+                                      reason="no higher-tier candidate available", **kw)
+            return RecoveryAction(RecoveryType.STOP, reason="no escalation path", **kw)
 
         it, ot = _EXPECTED_TOKENS.get(state.scope or "", _DEFAULT_TOKENS)
-        est = target.switch_cost_usd(state.context_tokens) + target.cost_usd(it, ot)
+        est_switch = target.switch_cost_usd(ctx_tokens)
+        est = est_switch + target.cost_usd(it, ot)
         if remaining is not None and est > remaining:
             return RecoveryAction(
                 RecoveryType.STOP,
                 reason=f"escalation to {target.model_id} (~${est:.4f}) exceeds remaining budget",
                 estimated_cost_usd=est,
-                budget_remaining_usd=remaining,
+                estimated_switch_cost_usd=est_switch,
+                **kw,
             )
         return RecoveryAction(
             RecoveryType.ESCALATE,
             model_id=target.model_id,
             reason=f"capability failure ({last.failure_category}); escalating tier "
-            f"(includes ~${target.switch_cost_usd(state.context_tokens):.4f} context re-ingest)",
+            f"(includes ~${est_switch:.4f} context re-ingest)",
             estimated_cost_usd=est,
-            budget_remaining_usd=remaining,
+            estimated_switch_cost_usd=est_switch,
+            **kw,
         )
 
     # -- helpers ---------------------------------------------------------------
