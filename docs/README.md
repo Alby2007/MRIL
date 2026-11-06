@@ -18,6 +18,7 @@ you want the API, at 08 if you want the plan.
 | [07 — Verification & Outcomes](07-verification-and-outcomes.md) | Why verified outcomes are the product's quality floor |
 | [08 — Roadmap](08-roadmap.md) | Milestones, what we've learned, open questions |
 | [09 — Design Decisions](09-design-decisions.md) | ADRs: the calls we've locked in and why |
+| [Handwritten fallback](handwritten-fallback.md) | What ~15 lines of DIY fallback doesn't give you — the v0.3 positioning test |
 
 **Status markers used throughout:** `[built]` = implemented and tested;
 `[partial]` = exists with known gaps; `[planned]` = design intent, not code.

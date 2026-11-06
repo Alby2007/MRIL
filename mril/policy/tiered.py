@@ -147,29 +147,48 @@ class TieredPolicy:
                 reason=f"max attempts reached ({constraints.max_attempts})",
                 **kw,
             )
-        if last.api_error:
-            return RecoveryAction(RecoveryType.RETRY, model_id=last.model_id,
-                                  reason=f"provider error: {last.api_error}", **kw)
+        it, ot = _EXPECTED_TOKENS.get(state.scope or "", _DEFAULT_TOKENS)
+        last_spec = registry.get(last.model_id or "")
+        retry_est = last_spec.cost_usd(it, ot) if last_spec else None
+
+        def retry_or_stop(reason: str) -> RecoveryAction:
+            if remaining is not None and retry_est is not None and retry_est > remaining:
+                return RecoveryAction(
+                    RecoveryType.STOP,
+                    reason=f"retry of {last.model_id} (~${retry_est:.4f}) "
+                    "exceeds remaining budget",
+                    estimated_cost_usd=retry_est,
+                    **kw,
+                )
+            return RecoveryAction(
+                RecoveryType.RETRY,
+                model_id=last.model_id,
+                reason=reason,
+                estimated_cost_usd=retry_est,
+                **kw,
+            )
+
+        # A passed attempt wins over an earlier transient api_error in the
+        # same attempt — the error was recovered inside the run; retrying
+        # would burn an attempt on work that already verified.
         if last.verification_status == "passed":
             return RecoveryAction(RecoveryType.CONTINUE, reason="verification passed", **kw)
+        if last.api_error:
+            return retry_or_stop(f"provider error: {last.api_error}")
         if last.verification_status in (None, "inconclusive"):
             return RecoveryAction(RecoveryType.CONTINUE,
                                   reason="no conclusive verification yet", **kw)
 
         # verification failed
         if last.failure_category in self.retryable_failures:
-            return RecoveryAction(RecoveryType.RETRY, model_id=last.model_id,
-                                  reason=f"retryable failure: {last.failure_category}", **kw)
+            return retry_or_stop(f"retryable failure: {last.failure_category}")
 
         # capability failure — try to escalate, pricing in the cache rewrite
         target = self._escalation_target(state, constraints, registry)
         if target is None:
             if len(state.attempts) + 1 < constraints.max_attempts:
-                return RecoveryAction(RecoveryType.RETRY, model_id=last.model_id,
-                                      reason="no higher-tier candidate available", **kw)
+                return retry_or_stop("no higher-tier candidate available")
             return RecoveryAction(RecoveryType.STOP, reason="no escalation path", **kw)
-
-        it, ot = _EXPECTED_TOKENS.get(state.scope or "", _DEFAULT_TOKENS)
         est_switch = target.switch_cost_usd(ctx_tokens)
         est = est_switch + target.cost_usd(it, ot)
         if remaining is not None and est > remaining:

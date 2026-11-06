@@ -121,3 +121,27 @@ snapshotted on every recovery decision so policies can be replayed offline.
 wrapper, not infrastructure. A rigorous negative result is a fine v0.2
 outcome — the instrument is the deliverable; learning earns its complexity
 against it.
+
+## ADR-011 — Run identity lives in private middleware state, not contextvars
+
+The LangChain adapter carries `mril_task_id`/`mril_attempt_id` in a
+`PrivateStateAttr` state schema (`before_agent` returns them; every
+`wrap_model_call` reads `request.state`). ContextVars remain only as a
+fallback for calls made outside a real agent run; step allocation is a
+lock-guarded counter keyed by attempt_id.
+
+*Why:* discovered by the first real `create_agent().ainvoke()` integration
+test — LangGraph executes each middleware hook in its own scheduled task.
+ContextVar writes propagate *down* into spawned children but never
+*sideways* between sibling tasks, so `before_agent`'s minted ids were
+invisible to `wrap_model_call`: two concurrent runs collapsed into one
+`agent-session` task while every unit test (single context) stayed green.
+Agent state is the only channel guaranteed to reach every hook in a run
+and never cross between runs. Do not "simplify" the adapter back to
+contextvar propagation — the sibling-task behavior is a framework
+invariant, not a bug we can fix.
+
+*Also:* `after_agent` reads the same state keys to free the per-attempt
+step counter; the counter can't live in the context either (parallel
+child calls would draw duplicate step indexes and collapse under the
+`(attempt, step, call_site)` dedupe key).

@@ -14,7 +14,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mril.core.decision import RecoveryType
-from mril.core.events import VerificationStatus, new_event_id
+from mril.core.events import (
+    RouteDecided,
+    TaskFinalized,
+    VerificationStatus,
+    new_event_id,
+)
 from mril.core.models import ModelRegistry
 from mril.core.task import RoutingConstraints, TaskContext
 from mril.eval.arms import Arm, apply_recovery
@@ -27,7 +32,7 @@ from mril.eval.failures import (
     structured_feedback,
 )
 from mril.eval.results import RunResult
-from mril.eval.spec import TaskSpec
+from mril.eval.spec import SpecError, TaskSpec
 from mril.eval.verifier import CommandVerifier
 from mril.eval.workspace import Workspace
 from mril.sdk import Router
@@ -82,7 +87,8 @@ class EvalRunner:
         router = Router(store, self.registry, arm.policy, self.default_constraints)
         constraints = RoutingConstraints(
             fallback_model_id=self.default_constraints.fallback_model_id,
-            budget_usd=spec.budget_usd or self.default_constraints.budget_usd,
+            budget_usd=(spec.budget_usd if spec.budget_usd is not None
+                        else self.default_constraints.budget_usd),
             max_attempts=spec.max_attempts,
             require_capabilities=self.default_constraints.require_capabilities,
         )
@@ -150,10 +156,11 @@ class EvalRunner:
                     else VerificationStatus.FAILED if verdict.passed is False
                     else VerificationStatus.INCONCLUSIVE
                 )
+                category = classify_failure(verdict)
                 router.observe_verification(
                     attempt_id, status,
                     task_id=run_task_id, verifier_type="test",
-                    failure_category=classify_failure(verdict),
+                    failure_category=category,
                     verification_run_id=verdict.run_id,
                 )
                 if verdict.passed:
@@ -161,9 +168,11 @@ class EvalRunner:
                 if self.capture_dir is not None:
                     self._capture_checkpoint(
                         spec, ws, run_task_id, attempt_i, d.model_id,
-                        verdict, classify_failure(verdict),
+                        verdict, category,
                     )
-                feedback = verdict.stdout[-2000:]
+                # Sanitized feedback only — raw verifier output leaks hidden
+                # test source/expected values into the agent's context.
+                feedback = sanitize_feedback(verdict, category)
                 action = router.next_action(run_task_id, constraints)
                 if action.type == RecoveryType.STOP:
                     break
@@ -196,23 +205,18 @@ def run_matrix(
     deterministically interleaved (run_order_seed, recorded in the manifest)
     so warm model caches / thermal state can't systematically favor the arm
     that happens to run first or last.
+
+    Re-running into an existing out_dir RESUMES rather than corrupts: cells
+    whose run_task_id already carries a TaskFinalized are skipped and their
+    results rebuilt from the ledger, so a crashed or extended matrix never
+    silently drops new events behind stale dedupe keys. results.jsonl is
+    appended per completed cell (crash-safe progress) and rewritten
+    canonically at the end.
     """
     import random
 
     out_dir = Path(out_dir)
     (out_dir / "work").mkdir(parents=True, exist_ok=True)
-    store = store_factory(out_dir / "eval.db")
-    combos = [
-        (spec, arm, seed)
-        for spec in corpus.tasks
-        for arm in arms
-        for seed in seeds
-    ]
-    random.Random(run_order_seed).shuffle(combos)
-    results = [
-        runner.run(spec, arm, seed, store, out_dir / "work")
-        for spec, arm, seed in combos
-    ]
     manifest = {
         "corpus_version": corpus.version,
         "registry_version": registry.version,
@@ -228,11 +232,147 @@ def run_matrix(
         # means nothing if generation itself is uncontrolled
         "generation": getattr(runner.driver, "generation_options", None),
         "cost_basis": "synthetic_token_price",
+        # recovery feedback shape is part of comparability: raw-traceback
+        # runs (pre-sanitization studies) must never be pooled with
+        # sanitized-feedback runs
+        "feedback_contract": "sanitized-v1",
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    with (out_dir / "results.jsonl").open("w", encoding="utf-8") as fh:
-        for r in results:
-            fh.write(json.dumps(r.to_dict()) + "\n")
-    store.close()
+
+    store = store_factory(out_dir / "eval.db")
+    try:
+        prior_events = store.all_events()
+        if prior_events:
+            # a populated ledger proves this dir already belongs to a matrix;
+            # only a compatible config may extend it — never silently mix
+            _assert_resume_compatible(
+                out_dir, corpus, registry, runner, arms, prior_events
+            )
+        (out_dir / "manifest.json").write_text(
+            json.dumps(manifest, indent=2), encoding="utf-8"
+        )
+        done = {
+            e.task_id
+            for e in prior_events
+            if isinstance(e, TaskFinalized)
+        }
+
+        def run_id(spec, arm, seed) -> str:
+            return f"{spec.task_id}:{arm.name}:{seed}"
+
+        combos = [
+            (spec, arm, seed)
+            for spec in corpus.tasks
+            for arm in arms
+            for seed in seeds
+        ]
+        random.Random(run_order_seed).shuffle(combos)
+        results = []
+        for spec, arm, seed in combos:
+            if run_id(spec, arm, seed) in done:
+                # previously completed cell — rebuild, never re-run
+                results.append(_result_from_ledger(store, spec, arm, seed))
+        results_path = out_dir / "results.jsonl"
+        with results_path.open("a", encoding="utf-8") as fh:
+            for spec, arm, seed in combos:
+                if run_id(spec, arm, seed) in done:
+                    continue
+                r = runner.run(spec, arm, seed, store, out_dir / "work")
+                results.append(r)
+                fh.write(json.dumps(r.to_dict()) + "\n")
+                fh.flush()
+        # canonical results file: exactly this matrix's cells
+        with results_path.open("w", encoding="utf-8") as fh:
+            for r in results:
+                fh.write(json.dumps(r.to_dict()) + "\n")
+    finally:
+        store.close()
     return results
+
+
+def _assert_resume_compatible(
+    out_dir: Path,
+    corpus: Corpus,
+    registry: ModelRegistry,
+    runner: "EvalRunner",
+    arms: tuple[Arm, ...],
+    prior_events: list,
+) -> None:
+    """Fail closed when an existing out dir isn't a resume of THIS matrix.
+
+    Resuming is legitimate only under an identical experimental config —
+    same corpus digest, registry identity, backend model map, generation
+    options, and (for arms that already have cells) policy fingerprints.
+    The manifest is checked first; the ledger's own recorded hashes are
+    checked per cell, because the ledger — not the manifest — is truth.
+    """
+    manifest_path = out_dir / "manifest.json"
+    if not manifest_path.is_file():
+        raise SpecError(
+            f"{out_dir} contains a ledger but no manifest.json — cannot "
+            "prove it belongs to this matrix; use a fresh --out dir"
+        )
+    old = json.loads(manifest_path.read_text(encoding="utf-8"))
+    mismatches = []
+    if old.get("corpus_version") != corpus.version:
+        mismatches.append(
+            f"corpus {old.get('corpus_version')} != {corpus.version}"
+        )
+    if (
+        old.get("registry_version") != registry.version
+        or old.get("registry_hash") != registry.hash
+    ):
+        mismatches.append(
+            f"registry {old.get('registry_version')}#{old.get('registry_hash')} "
+            f"!= {registry.version}#{registry.hash}"
+        )
+    if old.get("feedback_contract") != "sanitized-v1":
+        # pre-sanitization ledgers fed raw tracebacks to the model — their
+        # cells aren't comparable with sanitized-feedback runs
+        mismatches.append("feedback contract differs (pre-sanitized ledger)")
+    if old.get("model_map") != getattr(runner.driver, "models", None):
+        mismatches.append("model_map changed")
+    if old.get("generation") != getattr(runner.driver, "generation_options", None):
+        mismatches.append("generation options changed")
+    old_arms = {a["name"]: a["fingerprint"] for a in old.get("arms", [])}
+    for a in arms:
+        if a.name in old_arms and old_arms[a.name] != a.fingerprint:
+            mismatches.append(f"arm {a.name!r} fingerprint changed")
+    wanted = {a.name: a for a in arms}
+    for e in prior_events:
+        if not isinstance(e, RouteDecided) or e.task_id is None:
+            continue
+        parts = e.task_id.rsplit(":", 2)
+        arm = wanted.get(parts[1]) if len(parts) == 3 else None
+        if arm is None:
+            continue  # cell from an arm not being re-run — outside this matrix
+        if e.policy_hash != arm.policy.hash:
+            mismatches.append(
+                f"cell {e.task_id}: recorded policy #{e.policy_hash} "
+                f"!= {arm.policy.hash}"
+            )
+            break
+        if e.registry_hash and e.registry_hash != registry.hash:
+            mismatches.append(
+                f"cell {e.task_id}: recorded registry #{e.registry_hash} "
+                f"!= {registry.hash}"
+            )
+            break
+    if mismatches:
+        raise SpecError(
+            f"refusing to resume into an incompatible eval dir ({out_dir}):\n  - "
+            + "\n  - ".join(mismatches)
+            + "\nuse a fresh --out dir or delete this one"
+        )
+
+
+def _result_from_ledger(store, spec, arm, seed) -> RunResult:
+    """Reconstruct a RunResult for a cell completed in an earlier process —
+    the ledger is the source of truth; wall time comes from TaskFinalized."""
+    rid = f"{spec.task_id}:{arm.name}:{seed}"
+    events = store.events_for_task(rid)
+    fin = next(e for e in reversed(events) if isinstance(e, TaskFinalized))
+    return RunResult.from_ledger(
+        store, rid, spec.task_id, arm, seed,
+        wall_ms=fin.elapsed_ms or 0.0, finalized=fin,
+    )

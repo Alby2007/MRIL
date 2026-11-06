@@ -39,12 +39,14 @@ class Workspace:
 
     def read(self, relpath: str) -> str | None:
         p = self.path / relpath
-        return p.read_text() if p.is_file() else None
+        return (
+            p.read_text(encoding="utf-8", errors="replace") if p.is_file() else None
+        )
 
     def write(self, relpath: str, content: str) -> None:
         p = self.path / relpath
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(content)
+        p.write_text(content, encoding="utf-8")
 
     def tree(self, max_files: int = 40) -> str:
         files = sorted(

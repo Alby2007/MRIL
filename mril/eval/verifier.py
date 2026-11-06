@@ -27,6 +27,20 @@ from mril.eval.workspace import Workspace
 VERIFY_DIR = ".mril-verify"
 
 
+def _command_argv(command: str) -> list[str]:
+    """Build argv from a spec verify_command template.
+
+    Split the template BEFORE substitution: placeholders expand to real
+    paths that may contain spaces (sys.executable under e.g. "C:\\Program
+    Files\\") — splitting after substitution would shred them, and quoting
+    keeps them single-argument on every platform.
+    """
+    return [
+        tok.replace("{verify}", f"{VERIFY_DIR}/").replace("{python}", sys.executable)
+        for tok in shlex.split(command, posix=True)
+    ]
+
+
 @dataclass(frozen=True)
 class Verdict:
     run_id: str  # one per verifier execution — feeds verification_run_id
@@ -58,16 +72,15 @@ class CommandVerifier:
     def verify(self, spec: TaskSpec, workspace: Workspace) -> Verdict:
         run_id = new_event_id()
         env = self._make_verify_env(spec, workspace)
-        command = spec.verify_command.replace(
-            "{verify}", f"{VERIFY_DIR}/"
-        ).replace("{python}", sys.executable)
+        argv = _command_argv(spec.verify_command)
         started = time.monotonic()
         try:
             proc = subprocess.run(
-                shlex.split(command, posix=False),
+                argv,
                 cwd=env,
                 capture_output=True,
                 text=True,
+                errors="replace",
                 timeout=spec.verify_timeout_seconds,
             )
             return Verdict(

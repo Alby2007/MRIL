@@ -27,7 +27,7 @@ def load_registry(path: str | Path) -> "ModelRegistry":
     backends (see report.cost_basis), not billed amounts."""
     from mril.core.models import ModelRegistry, ModelSpec
 
-    d = json.loads(Path(path).read_text())
+    d = json.loads(Path(path).read_text(encoding="utf-8"))
     return ModelRegistry(
         version=d.get("version", "eval"),
         models=tuple(
@@ -126,7 +126,7 @@ class TaskSpec:
 
     @classmethod
     def load(cls, path: Path) -> "TaskSpec":
-        return cls.from_dict(json.loads(Path(path).read_text()))
+        return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

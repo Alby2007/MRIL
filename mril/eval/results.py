@@ -78,9 +78,10 @@ def load_results(path) -> list[RunResult]:
     import json
 
     out = []
-    for line in open(path):
-        d = json.loads(line)
-        d["invocation_latencies_ms"] = tuple(d["invocation_latencies_ms"])
-        d["models_used"] = tuple(d["models_used"])
-        out.append(RunResult(**d))
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            d = json.loads(line)
+            d["invocation_latencies_ms"] = tuple(d["invocation_latencies_ms"])
+            d["models_used"] = tuple(d["models_used"])
+            out.append(RunResult(**d))
     return out

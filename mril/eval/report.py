@@ -58,11 +58,20 @@ def _cluster_boot_ci(
     so the bootstrap resamples whole task clusters, not individual runs."""
     if not units or not other:
         return None
+    if not _flat(units) or not _flat(other):
+        return None
     rng, stats = random.Random(rng_seed), []
     nu, no = len(units), len(other)
     for _ in range(reps):
-        su = [units[rng.randrange(nu)] for _ in range(nu)]
-        so = [other[rng.randrange(no)] for _ in range(no)]
+        if nu == no:
+            # paired resample: same task clusters for both arms — the deltas
+            # are within-task, not across independently redrawn corpora
+            idx = [rng.randrange(nu) for _ in range(nu)]
+            su = [units[i] for i in idx]
+            so = [other[i] for i in idx]
+        else:
+            su = [units[rng.randrange(nu)] for _ in range(nu)]
+            so = [other[rng.randrange(no)] for _ in range(no)]
         stats.append(stats_fn(su, so))
     stats.sort()
     return stats[int(0.025 * reps)], stats[int(0.975 * reps)]
@@ -98,9 +107,6 @@ def _paired(results: list[RunResult], baseline: str) -> dict:
     tasks = sorted({t for t, _ in by_task_arm})
     arm_names = sorted({a for _, a in by_task_arm})
 
-    def clusters(arm: str) -> list[list[RunResult]]:
-        return [by_task_arm.get((t, arm), []) for t in tasks]
-
     def d_verified(a, b):
         va = statistics.mean(r.verified for r in _flat(a))
         vb = statistics.mean(r.verified for r in _flat(b))
@@ -114,12 +120,18 @@ def _paired(results: list[RunResult], baseline: str) -> dict:
         return statistics.mean(r.wall_ms for r in _flat(a)) - statistics.mean(
             r.wall_ms for r in _flat(b))
 
-    base = clusters(baseline)
     out = {}
     for arm in arm_names:
         if arm == baseline:
             continue
-        a = clusters(arm)
+        # paired comparison needs tasks both arms actually ran — a partial
+        # matrix or a missing baseline arm yields no pairing, not a crash
+        shared = [t for t in tasks
+                  if by_task_arm.get((t, arm)) and by_task_arm.get((t, baseline))]
+        if not shared:
+            continue
+        a = [by_task_arm[(t, arm)] for t in shared]
+        base = [by_task_arm[(t, baseline)] for t in shared]
         out[arm] = {
             "verified_delta": d_verified(a, base),
             "verified_delta_ci95": _cluster_boot_ci(d_verified, a, base),

@@ -11,7 +11,7 @@ from mril.core.models import ModelRegistry, ModelSpec
 from mril.core.task import RoutingConstraints, TaskContext
 from mril.eval.train import fit
 from mril.policy.empirical import EmpiricalCheapFirstPolicy, PolicySnapshot
-from mril.policy.features import TaskFeatures, features_from_context
+from mril.policy.features import FEATURE_VERSION, TaskFeatures, features_from_context
 from mril.store.sqlite import SQLiteEventStore
 from mril.store.memory import MemoryEventStore
 from mril.sdk import Router
@@ -48,8 +48,9 @@ def _snap(beta=None, cm=None, **kw):
     base = {"c_weak": 0.0002, "c_strong_fresh": 0.005, "c_strong_after_fail": 0.006,
             "c_handoff": 0.002, "q_recovery": 0.8, "q_fresh": 0.8}
     base.update(cm or {})
+    kw.setdefault("feature_version", FEATURE_VERSION)
     return PolicySnapshot(
-        version="1", feature_version="1", prior_strength=3.0,
+        version="1", prior_strength=3.0,
         beta={"global": [10.0, 3.0]} if beta is None else beta,
         cost_model=base, quality_margin=0.05, **kw)
 
@@ -151,6 +152,24 @@ def test_policy_epsilon_propensities():
     assert probs["strong-coder"] == pytest.approx(0.3 / 2)
 
 
+def test_policy_rejects_stale_feature_version():
+    """Beta buckets mean nothing under a different feature extractor — a v1
+    snapshot must be retrained, not silently applied. An empty beta is
+    exempt: no evidence exists to misapply."""
+    with pytest.raises(ValueError, match="feature_version"):
+        EmpiricalCheapFirstPolicy(snapshot=_snap(feature_version="1"))
+    # empty evidence -> version can't mislead -> construction still works
+    EmpiricalCheapFirstPolicy(snapshot=_snap(beta={}, feature_version="1"))
+
+
+def test_snapshot_hash_covers_decision_knobs():
+    """fallback/epsilon/feature_version all change decisions — identical
+    hashes across them would break replay."""
+    a = _snap()
+    for kw in ({"fallback": "strong"}, {"epsilon": 0.1}, {"feature_version": "1"}):
+        assert _snap(**kw).hash != a.hash
+
+
 def test_features_from_context_missing_metadata():
     f = features_from_context(TaskContext(task_id="t"))
     assert f.category == "unknown" and f.api_kind == "unknown"
@@ -230,6 +249,26 @@ def test_trainer_feature_buckets_from_taskstarted_metadata(tmp_path):
     feat_keys = [k for k in snap.beta if k.startswith("feat:")]
     assert feat_keys, "expected feature buckets"
     assert snap.beta["feat:api_kind=class"] == [0.0, 1.0]
+
+
+def test_trainer_uses_last_verdict_per_attempt(tmp_path):
+    """A corrected verdict (failed then passed on a re-run verifier) trains
+    on the LAST observation — matching rebuild_state, not the first."""
+    store = SQLiteEventStore(tmp_path / "l.db")
+    router = Router(store, ModelRegistry([WEAK, STRONG]), TieredPolicy(),
+                    RoutingConstraints())
+    ctx = TaskContext(task_id="tx")
+    d = router.route(ctx, RoutingConstraints())
+    router.observe_invocation(d.decision_id, "weak-coder", task_id="tx",
+                              attempt_id="a1", input_tokens=1, output_tokens=1)
+    from mril.core.events import VerificationStatus
+    router.observe_verification("a1", VerificationStatus.FAILED, task_id="tx",
+                                verification_run_id="r1")
+    router.observe_verification("a1", VerificationStatus.PASSED, task_id="tx",
+                                verification_run_id="r2")
+    store.close()
+    snap = fit(tmp_path / "l.db", weak_id="weak-coder", strong_id="strong-coder")
+    assert snap.beta["global"] == [1.0, 0.0]
 
 
 def test_fit_to_file(tmp_path):

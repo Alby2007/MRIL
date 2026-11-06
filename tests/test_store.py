@@ -42,6 +42,17 @@ def test_events_for_decision(store):
     assert len(store.events_for_decision("d2")) == 1
 
 
+def test_sqlite_wal_and_busy_timeout(tmp_path):
+    """WAL + busy_timeout let a `mril task` read coexist with a running
+    eval writer without SQLITE_BUSY."""
+    s = SQLiteEventStore(tmp_path / "w.db")
+    mode = s._conn.execute("PRAGMA journal_mode").fetchone()[0]
+    assert mode == "wal"
+    busy = s._conn.execute("PRAGMA busy_timeout").fetchone()[0]
+    assert busy == 5000
+    s.close()
+
+
 def test_sqlite_persists(tmp_path):
     path = tmp_path / "ledger.db"
     s1 = SQLiteEventStore(path)

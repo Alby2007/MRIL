@@ -122,9 +122,26 @@ class CheapFirstPolicy(TieredPolicy):
                     if constraints.budget_usd is not None
                     else None
                 )
+                it, ot = _EXPECTED_TOKENS.get(state.scope or "", _DEFAULT_TOKENS)
+                last_spec = registry.get(last.model_id or "")
+                retry_est = last_spec.cost_usd(it, ot) if last_spec else None
+                if (
+                    remaining is not None
+                    and retry_est is not None
+                    and retry_est > remaining
+                ):
+                    return RecoveryAction(
+                        RecoveryType.STOP,
+                        reason=f"retry of {last.model_id} (~${retry_est:.4f}) "
+                        "exceeds remaining budget",
+                        estimated_cost_usd=retry_est,
+                        context_tokens=state.context_tokens,
+                        budget_remaining_usd=remaining,
+                    )
                 return RecoveryAction(
                     RecoveryType.RETRY,
                     model_id=last.model_id,
+                    estimated_cost_usd=retry_est,
                     reason=f"failure {consec}/{self.failure_threshold} before escalation",
                     context_tokens=state.context_tokens,
                     budget_remaining_usd=remaining,

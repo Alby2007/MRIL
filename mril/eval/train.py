@@ -61,7 +61,7 @@ def _attempts(events: list[Event]) -> list[_Attempt]:
                     latency_ms=(first.latency_ms or 0) + (e.latency_ms or 0),
                 )
         elif isinstance(e, VerificationCompleted) and e.attempt_id:
-            ver.setdefault(e.attempt_id, e)  # first verdict per attempt
+            ver[e.attempt_id] = e  # last verdict per attempt — matches rebuild_state
     out = []
     for i, aid in enumerate(order):
         v = ver.get(aid)

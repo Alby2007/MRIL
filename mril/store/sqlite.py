@@ -36,6 +36,10 @@ class SQLiteEventStore:
     def __init__(self, path: str | Path = "mril.db"):
         self._conn = sqlite3.connect(str(path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        # WAL + busy timeout: the eval runner and a `mril task` inspection can
+        # coexist on one ledger without SQLITE_BUSY on the first read.
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA busy_timeout=5000")
         self._lock = threading.Lock()
         with self._conn:
             self._conn.executescript(_SCHEMA)

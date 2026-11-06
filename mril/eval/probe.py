@@ -9,6 +9,7 @@ Results land in probe-results.jsonl; pairing key is checkpoint_id.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import tempfile
 import zlib
@@ -20,9 +21,17 @@ from mril.eval.workspace import Workspace
 ARMS = ("handoff-current", "handoff-structured")
 
 # Patterns that must never reach a probe prompt — hidden-verifier content.
-# Note: "assert" is deliberately absent — the legitimate category name
-# "assertion_failure" contains it. Patterns target verifier-output shapes.
-_LEAK_PATTERNS = ("test_", "verifiers/", "E ", ">", ".py:", "==")
+# They match verifier-output shapes (test defs, tracebacks, pytest's 'E '
+# failure lines), never the legitimate category names — "test_failure" and
+# "verifier_error" are part of the frozen feedback contract and must pass.
+_LEAK_PATTERNS = (
+    r"def test_\w+",      # verifier source lines
+    r"test_\w*\.py",      # verifier filenames
+    r"verifiers/",        # corpus-relative verifier paths
+    r"(?m)^\s*E\s",       # pytest 'E  assert ...' failure detail lines
+    r"\.py:\d+",          # traceback file:line refs
+    r"==",                # expected-vs-actual comparisons
+)
 
 
 def audit_checkpoint(meta: dict) -> list[str]:
@@ -31,7 +40,7 @@ def audit_checkpoint(meta: dict) -> list[str]:
     for arm in ARMS:
         fb = meta["feedback_sanitized" if arm == "handoff-current" else "feedback_structured"]
         for pat in _LEAK_PATTERNS:
-            if pat in fb:
+            if re.search(pat, fb):
                 hits.append(f"{meta['checkpoint_id']}:{arm} contains {pat!r}")
     return hits
 
@@ -57,7 +66,7 @@ def run_probe(
     leaks = []
     metas = []
     for cdir in checkpoints:
-        meta = json.loads((cdir / "checkpoint.json").read_text())
+        meta = json.loads((cdir / "checkpoint.json").read_text(encoding="utf-8"))
         # Only checkpoints whose failed attempt used the entry model, and only
         # valid failure evidence (verifier_error carries no code signal).
         if failed_model and meta["model_id"] != failed_model:

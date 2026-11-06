@@ -12,6 +12,9 @@ Design rules:
   routing can be adopted without re-instrumenting adapters.
 - Terminal outcomes distinguish verified results from inconclusive ones; a
   missing verification must never be treated as a success.
+- Readers tolerate unknown keys AND newer schema versions (fix-forward
+  replay). SCHEMA_VERSION only bumps on breaking changes; no migrations
+  exist yet because none have been needed.
 """
 
 from __future__ import annotations

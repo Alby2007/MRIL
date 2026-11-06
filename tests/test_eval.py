@@ -15,7 +15,8 @@ from mril.eval import (
     CommandVerifier, Corpus, EvalRunner, SpecError, TaskSpec, Workspace,
     default_arms, load_corpus, run_matrix,
 )
-from mril.eval.arms import CheapFirstPolicy, StrongestPolicy
+from mril.eval.arms import Arm, CheapFirstPolicy, StrongestPolicy
+from mril.policy.tiered import TieredPolicy
 from mril.eval.report import build_report, write_report
 from mril.eval.results import load_results
 from mril.eval.runner import EvalRunner as _R  # noqa
@@ -226,6 +227,247 @@ def test_run_matrix_end_to_end(corpus, registry, tmp_path):
     assert report["guardrail"]["violations"] == []
     write_report(report, out)
     assert (out / "REPORT.md").is_file()
+
+
+def test_runner_feedback_is_sanitized(corpus, registry, tmp_path):
+    """Raw verifier stdout (test source, expected values) must never reach
+    the driver — feedback carries only counts + category."""
+    seen = []
+
+    class RecordingDriver:
+        def generate(self, *, model_id, spec, workspace, attempt_index,
+                     prior_feedback, seed=None):
+            seen.append(prior_feedback)
+            workspace.write(spec.target_file, BUGGY)
+            from mril.eval.drivers import DriverResult
+            return DriverResult(text=BUGGY, input_tokens=10, output_tokens=5)
+
+    runner = _runner(registry, corpus, RecordingDriver())
+    spec = corpus.tasks[0]
+    store = SQLiteEventStore(tmp_path / "one.db")
+    runner.run(spec, default_arms()[1], 0, store, tmp_path)
+    store.close()
+    assert len(seen) > 1  # at least one retry with feedback
+    fb = "\n".join(f for f in seen[1:] if f)
+    assert "def test_add" not in fb and "assert add(2, 3) ==" not in fb
+    assert "checks failed" in fb
+
+
+def test_run_matrix_resumes_completed_cells(corpus, registry, tmp_path):
+    """Re-running into the same out dir is a resume: finalized cells are
+    rebuilt from the ledger, never re-executed."""
+    driver = ScriptedDriver({"weak": [FIXED], "strong": [FIXED]})
+    runner = _runner(registry, corpus, driver)
+    out = tmp_path / "eval-out"
+    r1 = run_matrix(corpus, registry, runner, out, seeds=(0,),
+                    arms=default_arms(), store_factory=SQLiteEventStore)
+    r2 = run_matrix(corpus, registry, runner, out, seeds=(0,),
+                    arms=default_arms(), store_factory=SQLiteEventStore)
+    assert len(driver.calls) == 3  # nothing re-ran
+    assert {r.run_task_id for r in r2} == {r.run_task_id for r in r1}
+    assert all(r.verified for r in r2)
+
+
+def test_run_matrix_extends_matrix_cleanly(corpus, registry, tmp_path):
+    driver = ScriptedDriver({"weak": [FIXED], "strong": [FIXED]})
+    runner = _runner(registry, corpus, driver)
+    out = tmp_path / "eval-out"
+    run_matrix(corpus, registry, runner, out, seeds=(0,),
+               arms=default_arms(), store_factory=SQLiteEventStore)
+    r2 = run_matrix(corpus, registry, runner, out, seeds=(0, 1),
+                    arms=default_arms(), store_factory=SQLiteEventStore)
+    assert len(driver.calls) == 6  # only the new seed cells ran
+    assert len(r2) == 6
+
+
+def test_run_matrix_survives_run_crash_and_resumes(corpus, registry, tmp_path):
+    class CrashingDriver:
+        def __init__(self):
+            self.calls = 0
+
+        def generate(self, *, model_id, spec, workspace, **kw):
+            self.calls += 1
+            if self.calls == 2:
+                raise RuntimeError("driver died")
+            workspace.write(spec.target_file, FIXED)
+            from mril.eval.drivers import DriverResult
+            return DriverResult(text=FIXED, input_tokens=1, output_tokens=1)
+
+    out = tmp_path / "eval-out"
+    runner = _runner(registry, corpus, CrashingDriver())
+    with pytest.raises(RuntimeError):
+        run_matrix(corpus, registry, runner, out, seeds=(0,),
+                   arms=default_arms(), store_factory=SQLiteEventStore)
+    # progress persisted: a later process completes the remaining cells
+    runner2 = _runner(registry, corpus,
+                      ScriptedDriver({"weak": [FIXED], "strong": [FIXED]}))
+    results = run_matrix(corpus, registry, runner2, out, seeds=(0,),
+                         arms=default_arms(), store_factory=SQLiteEventStore)
+    assert len(results) == 3
+    lines = (out / "results.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 3
+
+
+def test_verify_command_split_before_substitution():
+    """{python} expands to a real interpreter path — possibly containing
+    spaces — and must survive as ONE argv element. Quoting in the template
+    is honored."""
+    from mril.eval.verifier import _command_argv
+    argv = _command_argv('{python} -m pytest {verify}t_a.py -q --tb="short mode"')
+    assert argv[0] == sys.executable
+    assert argv[3] == ".mril-verify/t_a.py"
+    assert argv[-1] == "--tb=short mode"
+
+
+def test_failure_classifier_ignores_source_echo():
+    """pytest's '>' source-echo lines can contain words like SyntaxError —
+    classification must match the error signature, not echoed code."""
+    from mril.eval.failures import classify_failure
+    from mril.eval.verifier import Verdict
+    out = (
+        "________________ test_x ________________\n"
+        ">       import m  # handles SyntaxError gracefully\n"
+        "E       assert 1 == 2\n"
+        "1 failed in 0.01s\n"
+    )
+    assert classify_failure(Verdict("r", False, 1, out, 1.0)) == "assertion_failure"
+
+
+def test_budget_zero_is_honored(corpus, registry, tmp_path):
+    """budget_usd=0.0 is a real budget (zero), not 'unset' — the run must
+    stop on budget, not silently inherit the default."""
+    import dataclasses
+    spec = dataclasses.replace(corpus.tasks[0], budget_usd=0.0)
+    runner = _runner(registry, corpus, ScriptedDriver({"weak": [BUGGY]}))
+    store = SQLiteEventStore(tmp_path / "b.db")
+    r = runner.run(spec, default_arms()[1], 0, store, tmp_path)
+    store.close()
+    assert r.attempts == 1  # stopped on budget, not on max_attempts
+
+
+def test_eval_run_rejects_unknown_arm(corpus, tmp_path):
+    from mril.cli import main
+    reg = tmp_path / "reg.json"
+    reg.write_text(json.dumps({"version": "r", "models": [
+        {"model_id": "weak", "tier": "cheap"},
+        {"model_id": "strong", "tier": "frontier"}]}))
+    rc = main(["eval", "run", "--corpus", str(corpus.root),
+               "--registry", str(reg), "--out", str(tmp_path / "o"),
+               "--arms", "nope"])
+    assert rc == 1
+
+
+def test_retry_denied_when_over_budget(registry):
+    """RETRY costs a real attempt — when its estimate exceeds the remaining
+    budget the policy must STOP, not silently overspend."""
+    from mril.policy.state import AttemptRecord, TaskState
+    state = TaskState("t")
+    state.attempts.append(AttemptRecord(
+        attempt_id="a1", model_id="weak", cost_usd=0.009,
+        input_tokens=100, api_error="TimeoutError"))
+    state.total_cost_usd = 0.009
+    # remaining = 0.01 - 0.009 = 0.001 < retry est (~0.0035 at default tokens)
+    action = TieredPolicy().recover(
+        state, RoutingConstraints(budget_usd=0.01, max_attempts=5), registry)
+    assert action.type == RecoveryType.STOP
+    assert "budget" in action.reason
+
+
+def test_resume_refuses_changed_corpus(corpus, registry, tmp_path):
+    """A cell finalized under one corpus digest must never be silently
+    resumed under another — same run ids, different experiment."""
+    runner = _runner(registry, corpus,
+                     ScriptedDriver({"weak": [FIXED], "strong": [FIXED]}))
+    out = tmp_path / "eval-out"
+    run_matrix(corpus, registry, runner, out, seeds=(0,),
+               arms=default_arms(), store_factory=SQLiteEventStore)
+    spec_path = corpus.root / "task-a" / "task.json"
+    spec_d = json.loads(spec_path.read_text())
+    spec_d["task"]["instruction"] = "a different task entirely"
+    spec_path.write_text(json.dumps(spec_d))
+    corpus2 = load_corpus(corpus.root)
+    with pytest.raises(SpecError, match="incompatible"):
+        run_matrix(corpus2, registry, runner, out, seeds=(0,),
+                   arms=default_arms(), store_factory=SQLiteEventStore)
+
+
+def test_resume_refuses_changed_registry(corpus, registry, tmp_path):
+    runner = _runner(registry, corpus,
+                     ScriptedDriver({"weak": [FIXED], "strong": [FIXED]}))
+    out = tmp_path / "eval-out"
+    run_matrix(corpus, registry, runner, out, seeds=(0,),
+               arms=default_arms(), store_factory=SQLiteEventStore)
+    registry2 = ModelRegistry(version="eval-2", models=registry.models)
+    with pytest.raises(SpecError, match="registry"):
+        run_matrix(corpus, registry2, runner, out, seeds=(0,),
+                   arms=default_arms(), store_factory=SQLiteEventStore)
+
+
+def test_resume_refuses_changed_arm_fingerprint(corpus, registry, tmp_path):
+    runner = _runner(registry, corpus,
+                     ScriptedDriver({"weak": [FIXED], "strong": [FIXED]}))
+    out = tmp_path / "eval-out"
+    run_matrix(corpus, registry, runner, out, seeds=(0,), arms=default_arms(),
+               store_factory=SQLiteEventStore)
+    changed = (default_arms()[0],
+               Arm("cheap-first", CheapFirstPolicy(failure_threshold=5)),
+               default_arms()[2])
+    with pytest.raises(SpecError, match="fingerprint"):
+        run_matrix(corpus, registry, runner, out, seeds=(0,), arms=changed,
+                   store_factory=SQLiteEventStore)
+
+
+def test_resume_refuses_unprovenanced_ledger(corpus, registry, tmp_path):
+    """A ledger without a manifest can't be proven to belong to this
+    matrix — fail closed rather than guess."""
+    runner = _runner(registry, corpus,
+                     ScriptedDriver({"weak": [FIXED], "strong": [FIXED]}))
+    out = tmp_path / "eval-out"
+    run_matrix(corpus, registry, runner, out, seeds=(0,), arms=default_arms(),
+               store_factory=SQLiteEventStore)
+    (out / "manifest.json").unlink()
+    with pytest.raises(SpecError, match="manifest"):
+        run_matrix(corpus, registry, runner, out, seeds=(0,),
+                   arms=default_arms(), store_factory=SQLiteEventStore)
+
+
+def test_probe_audit_accepts_legit_categories_and_catches_leaks():
+    """The frozen feedback contract names categories like 'test_failure' —
+    the leak audit must pass them but still catch real verifier content."""
+    from mril.eval.failures import sanitize_feedback, structured_feedback
+    from mril.eval.probe import audit_checkpoint
+    from mril.eval.verifier import Verdict
+
+    v = Verdict("r1", False, 1, "1 failed, 2 passed in 0.01s", 10.0)
+    meta = {"checkpoint_id": "c1",
+            "feedback_sanitized": sanitize_feedback(v, "test_failure"),
+            "feedback_structured": structured_feedback(v, "test_failure")}
+    assert audit_checkpoint(meta) == []
+
+    leaked = dict(meta)
+    leaked["feedback_sanitized"] = "def test_add():\n    assert add(2,3) == 5"
+    assert audit_checkpoint(leaked)
+
+
+def test_report_survives_missing_baseline_arm():
+    """A matrix run without the quality-baseline arm still reports — the
+    paired section just has no comparisons."""
+    from mril.eval.results import RunResult
+    results = [RunResult(run_task_id="t:cheap-first:0", task_id="t",
+                         arm="cheap-first", seed=0, outcome="verified_success",
+                         verified=True, attempts=1, model_calls=1,
+                         escalations=0, total_cost_usd=0.01, wall_ms=100)]
+    report = build_report(results, {"corpus_version": "x"})
+    assert report["paired"]["comparisons"] == {}
+    assert report["guardrail"]["violations"] == []
+
+
+def test_workspace_utf8_roundtrip(tmp_path):
+    """Model output routinely contains non-ASCII — workspace I/O is utf-8,
+    not the platform default (cp1252 on Windows)."""
+    ws = Workspace(tmp_path / "ws")
+    ws.write("solution.py", "x = '→ é ✓'\n")
+    assert "→" in ws.read("solution.py")
 
 
 def test_report_flags_quality_regression(registry):

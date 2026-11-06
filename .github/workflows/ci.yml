@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  core:
+    name: core (${{ matrix.os }}, py${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      # Full suite minus the real-LangChain file: its tests skip cleanly
+      # without the extra, and the dedicated job below runs them for real.
+      - run: pytest -q --ignore=tests/test_langchain_integration.py
+
+  langchain:
+    # The real create_agent().ainvoke() lifecycle. MRIL_REQUIRE_LANGCHAIN
+    # turns the module-level importorskip into a hard import failure, so a
+    # missing/broken extra fails the job instead of silently skipping.
+    name: langchain integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,langchain]"
+      - run: pytest tests/test_langchain_integration.py -v
+        env:
+          MRIL_REQUIRE_LANGCHAIN: "1"
+
+  wheel:
+    # Build the artifact, install THAT into a fresh env, smoke it — the
+    # path a new developer actually takes, not an editable checkout.
+    name: wheel install smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - name: install wheel in a fresh venv
+        run: |
+          python -m venv /tmp/mril-smoke
+          /tmp/mril-smoke/bin/pip install dist/mril-*.whl
+      - name: artifact smoke
+        run: |
+          /tmp/mril-smoke/bin/python -c "
+          import sys, mril
+          from mril import Router, ModelRegistry, ModelSpec, TaskContext
+          from mril.store.memory import MemoryEventStore
+          bad = [m for m in sys.modules
+                 if m.split('.')[0] in ('langchain','langchain_core','ollama',
+                                        'requests','httpx')]
+          assert not bad, bad
+          r = Router(store=MemoryEventStore(),
+                     registry=ModelRegistry(version='w', models=(
+                         ModelSpec('m', provider='p', tier='cheap',
+                                   input_price=1, output_price=1),)))
+          assert r.route(TaskContext(task_id='t')).model_id == 'm'
+          import mril.adapters.langchain
+          print('wheel smoke ok, mril', mril.__version__)
+          "
+          /tmp/mril-smoke/bin/mril --help >/dev/null

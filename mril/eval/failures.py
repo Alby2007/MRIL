@@ -63,7 +63,13 @@ def classify_failure(verdict: Verdict) -> str | None:
         # with the ambiguity explicit in the category. Anything else means
         # the harness itself failed: invalid evidence, marked distinctly.
         return "verify_timeout" if verdict.timed_out else "verifier_error"
-    out = verdict.stdout
+    # Drop pytest's '>' source-echo lines before matching: the echoed test
+    # source can itself contain words like SyntaxError / has no attribute,
+    # which would mislabel the real failure signature.
+    out = "\n".join(
+        line for line in verdict.stdout.splitlines()
+        if not line.lstrip().startswith(">")
+    )
     if _SYNTAX.search(out):
         return "syntax_error"
     if _CONTRACT.search(out):

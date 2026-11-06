@@ -180,12 +180,69 @@ def test_recovery_checkpoint_first_committed_wins(registry):
     _, inv = _attempt_flow(r)
     # a stop decision lands first (e.g. a racing caller)
     r.store.append(RD(task_id="issue-1", action="stop", reason="racer",
-                      dedupe_key=f"rec:issue-1:1:{inv.attempt_id}"))
+                      dedupe_key=f"rec:issue-1:1:{inv.attempt_id}:failed:test_failure:-"))
     action = r.next_action("issue-1")  # policy would escalate; stored wins
     assert action.type == RecoveryType.STOP
     recs = [e for e in r.store.events_for_task("issue-1")
             if isinstance(e, RecoveryDecided)]
     assert len(recs) == 1
+
+
+def test_next_action_reevaluates_when_verification_lands(registry):
+    """A checkpoint committed BEFORE verification must not shadow the real
+    decision: fresh failed evidence is a new checkpoint and decides anew."""
+    r = make_router(registry)
+    d = r.route(ctx())
+    inv = r.observe_invocation(d.decision_id, d.model_id, task_id="issue-1",
+                               input_tokens=10_000, output_tokens=2_000)
+    a1 = r.next_action("issue-1")  # nothing conclusive yet
+    assert a1.type == RecoveryType.CONTINUE
+    r.observe_verification(inv.attempt_id, VerificationStatus.FAILED,
+                           task_id="issue-1", verifier_type="test",
+                           failure_category="test_failure")
+    a2 = r.next_action("issue-1")
+    assert a2.type == RecoveryType.ESCALATE
+    recs = [e for e in r.store.events_for_task("issue-1")
+            if isinstance(e, RecoveryDecided)]
+    assert len(recs) == 2  # distinct checkpoints, both recorded
+
+
+def test_fallback_never_returns_restricted_or_unknown(registry):
+    """restricted=True means NEVER auto-select — including via the degraded
+    fallback path. A bad fallback config falls through to eligible models."""
+    class FailingPolicy:
+        name, version, hash = "failing", "0", "x"
+
+        def select(self, *a, **k):
+            raise RuntimeError("policy down")
+
+        def recover(self, *a, **k):
+            raise RuntimeError("policy down")
+
+    for bad_fallback in ("restricted-lab", "no-such-model"):
+        r = make_router(
+            registry, policy=FailingPolicy(),
+            constraints=RoutingConstraints(fallback_model_id=bad_fallback),
+        )
+        d = r.route(ctx())
+        assert d.degraded
+        assert d.model_id == "cheap-8b"  # cheapest eligible, not the bad config
+        assert d.model_id in {m.model_id for m in registry.candidates()}
+
+
+def test_passed_attempt_with_earlier_api_error_is_continued(registry):
+    """An attempt that hit a transient provider error and then still passed
+    verification is DONE — recovery must not retry finished work."""
+    r = make_router(registry)
+    d = r.route(ctx())
+    r.observe_invocation(d.decision_id, d.model_id, task_id="issue-1",
+                         attempt_id="a1", api_error="TimeoutError: slow",
+                         step_index=0, call_site="model_call")
+    r.observe_invocation(d.decision_id, d.model_id, task_id="issue-1",
+                         attempt_id="a1", input_tokens=100, output_tokens=10,
+                         step_index=1, call_site="model_call")
+    r.observe_verification("a1", VerificationStatus.PASSED, task_id="issue-1")
+    assert r.next_action("issue-1").type == RecoveryType.CONTINUE
 
 
 def test_recovery_decided_carries_context_snapshot(registry):

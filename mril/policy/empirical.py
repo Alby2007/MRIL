@@ -42,7 +42,7 @@ from dataclasses import dataclass, field
 from mril.core.models import tier_index
 from mril.core.task import RoutingConstraints, TaskContext
 from mril.policy.base import PolicySelection, params_hash
-from mril.policy.features import features_from_context
+from mril.policy.features import FEATURE_VERSION, features_from_context
 from mril.policy.tiered import TieredPolicy, _blended_price
 
 SNAPSHOT_VERSION = "1"
@@ -70,10 +70,16 @@ class PolicySnapshot:
 
     @property
     def hash(self) -> str:
+        # Every decision-relevant knob is fingerprinted — snapshots that
+        # differ only in fallback/epsilon/feature_version still diverge.
+        # trained_on_runs / trained_from_ledger are provenance, not
+        # decision inputs, and stay out.
         return params_hash({"version": self.version, "beta": self.beta,
                             "cost_model": self.cost_model,
+                            "feature_version": self.feature_version,
                             "prior_strength": self.prior_strength,
-                            "quality_margin": self.quality_margin})
+                            "quality_margin": self.quality_margin,
+                            "fallback": self.fallback, "epsilon": self.epsilon})
 
     # -- estimator -----------------------------------------------------------
 
@@ -161,11 +167,22 @@ class EmpiricalCheapFirstPolicy(TieredPolicy):
     version: str = "0.3.0"
     snapshot: PolicySnapshot = field(
         default_factory=lambda: PolicySnapshot(
-            version=SNAPSHOT_VERSION, feature_version="1",
+            version=SNAPSHOT_VERSION, feature_version=FEATURE_VERSION,
             prior_strength=3.0, beta={}, cost_model={},
         )
     )
     epsilon: float = 0.0
+
+    def __post_init__(self) -> None:
+        # Feature extraction evolves across FEATURE_VERSIONs; a snapshot's
+        # beta buckets are only meaningful under the version that produced
+        # them. An empty beta carries no evidence, so version can't mislead.
+        if self.snapshot.beta and self.snapshot.feature_version != FEATURE_VERSION:
+            raise ValueError(
+                f"snapshot trained under feature_version="
+                f"{self.snapshot.feature_version!r}; current is "
+                f"{FEATURE_VERSION!r} — retrain (mril eval train) before reuse"
+            )
 
     @property
     def hash(self) -> str:

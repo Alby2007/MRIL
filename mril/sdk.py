@@ -232,13 +232,23 @@ class Router:
         except Exception as exc:
             action = RecoveryAction(RecoveryType.CONTINUE, reason=f"recovery error: {exc}")
         # A recovery *checkpoint* is identified by the state at decision time,
-        # never by the action chosen. First committed decision wins: a repeat
-        # or racing call on unchanged state gets the recorded action back —
-        # this is what keeps a stochastic recovery policy single-draw.
+        # never by the action chosen — including the failure evidence observed
+        # since the last attempt, so a pre-verification 'continue' can't shadow
+        # the decision that fresh evidence demands. First committed decision
+        # wins: a repeat or racing call on unchanged state gets the recorded
+        # action back — this is what keeps a stochastic policy single-draw.
         last = state.last_attempt
-        dedupe_key = (
-            f"rec:{task_id}:{len(state.attempts)}:{last.attempt_id if last else '-'}"
-        )
+        evidence = "-"
+        if last is not None:
+            evidence = ":".join(
+                (
+                    last.attempt_id,
+                    last.verification_status.value if last.verification_status else "-",
+                    last.failure_category or "-",
+                    "err" if last.api_error else "-",
+                )
+            )
+        dedupe_key = f"rec:{task_id}:{len(state.attempts)}:{evidence}"
         event = RecoveryDecided(
             task_id=task_id,
             action=action.type.value,
@@ -338,8 +348,12 @@ class Router:
     def _fallback_model(
         self, constraints: RoutingConstraints, candidates: list
     ) -> str:
+        # A configured fallback must itself be routable — restricted or
+        # unknown ids are skipped rather than smuggled past eligibility.
         if constraints.fallback_model_id:
-            return constraints.fallback_model_id
+            spec = self.registry.get(constraints.fallback_model_id)
+            if spec is not None and not spec.restricted:
+                return spec.model_id
         if candidates:
             return min(candidates, key=lambda m: (m.input_price + m.output_price, m.model_id)).model_id
         non_restricted = [m for m in self.registry.models if not m.restricted]

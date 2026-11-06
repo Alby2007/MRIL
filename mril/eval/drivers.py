@@ -49,7 +49,7 @@ class AgentDriver(Protocol):
 _FENCE = re.compile(r"```(?:\w+)?\s*(.*?)```", re.DOTALL)
 
 
-def _extract_code(text: str, marker: str) -> str | None:
+def _extract_code(text: str) -> str | None:
     m = _FENCE.search(text)
     if m:
         return m.group(1).strip()
@@ -150,7 +150,7 @@ class OllamaDriver:
             return DriverResult(api_error=f"{type(exc).__name__}: {exc}")
 
         text = payload.get("response", "")
-        code = _extract_code(text, spec.target_file)
+        code = _extract_code(text)
         written: tuple[str, ...] = ()
         if code is not None:
             workspace.write(spec.target_file, code)
