@@ -1,0 +1,32 @@
+{
+  "id": "bug-late-binding",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-late-binding/snapshot",
+    "sha256": "87a683946a284a8e8bf2cc8733ad5a25f2b9b8dd00d596d7244fd2fd8dc98eac"
+  },
+  "task": {
+    "instruction": "Fix make_counters(n) in solution.py: it should return a list of n functions where calling the i-th returns i. Currently every function returns the same value due to a closure bug. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-late-binding/verifiers/test_lb.py"
+    ],
+    "command": "{python} -m pytest {verify}test_lb.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium"
+  }
+}

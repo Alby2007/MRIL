@@ -1,0 +1,32 @@
+{
+  "id": "impl-topk-words",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-topk-words/snapshot",
+    "sha256": "7bbd367d67ae944d6c64cfddd4abe36dea1b353e1f4c2b7d7be052eb279a9c90"
+  },
+  "task": {
+    "instruction": "Implement top_k_words(text, k) in solution.py: return the k most frequent words as a list, most frequent first; ties broken alphabetically; words are lowercase alphanumeric sequences (case-insensitive, strip punctuation). Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-topk-words/verifiers/test_topk.py"
+    ],
+    "command": "{python} -m pytest {verify}test_topk.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium"
+  }
+}

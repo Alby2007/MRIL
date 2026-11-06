@@ -1,0 +1,32 @@
+{
+  "id": "impl-palindrome",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-palindrome/snapshot",
+    "sha256": "829ac2379449e907e38e98fd07e8733a35dbc570af5b00f195092563da7acf22"
+  },
+  "task": {
+    "instruction": "Implement is_palindrome(s) in solution.py: True for palindromes ignoring case and all non-alphanumeric characters. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_file",
+    "risk": "low",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-palindrome/verifiers/test_palindrome.py"
+    ],
+    "command": "{python} -m pytest {verify}test_palindrome.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "easy"
+  }
+}

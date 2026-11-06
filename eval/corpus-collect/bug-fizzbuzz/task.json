@@ -1,0 +1,32 @@
+{
+  "id": "bug-fizzbuzz",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-fizzbuzz/snapshot",
+    "sha256": "fa6d96ef609fd13c46ae985f0073a720f5d384b8520bcd9390f0c50fb556c708"
+  },
+  "task": {
+    "instruction": "Fix the bug in solution.py: fizzbuzz(15) and other multiples of both 3 and 5 must return 'FizzBuzz'. Reply with only the complete corrected file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_file",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-fizzbuzz/verifiers/test_fizzbuzz.py"
+    ],
+    "command": "{python} -m pytest {verify}test_fizzbuzz.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium"
+  }
+}

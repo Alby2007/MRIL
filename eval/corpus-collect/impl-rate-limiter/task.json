@@ -1,0 +1,32 @@
+{
+  "id": "impl-rate-limiter",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-rate-limiter/snapshot",
+    "sha256": "ce7b4dc3079e62e47e11c876fde4ece4947c800143720b02b17f4b56807948b6"
+  },
+  "task": {
+    "instruction": "Implement TokenBucket(capacity, refill_per_sec) in solution.py: allow(tokens, now) consumes tokens if available (returns True) else False; tokens refill continuously at refill_per_sec up to capacity; 'now' is an injected float timestamp. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-rate-limiter/verifiers/test_bucket.py"
+    ],
+    "command": "{python} -m pytest {verify}test_bucket.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard"
+  }
+}

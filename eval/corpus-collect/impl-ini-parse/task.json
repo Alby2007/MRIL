@@ -1,0 +1,32 @@
+{
+  "id": "impl-ini-parse",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-ini-parse/snapshot",
+    "sha256": "7b8be7f6d37ab4b02cae5a094deeb956e607a4b7906b885e055edbc19b361d63"
+  },
+  "task": {
+    "instruction": "Implement parse_ini(text) in solution.py: INI text -> nested dict. Sections in [brackets]; key = value pairs; top-level keys before any section allowed; ; and # are comments; coerce values to int/float/bool where they parse, else keep str. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-ini-parse/verifiers/test_ini.py"
+    ],
+    "command": "{python} -m pytest {verify}test_ini.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "id": "class-bank",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "class-bank/snapshot",
+    "sha256": "dd74ae14affd7d1f03daca0d5ac398712ae1fa1d91b69b482fe5334a403135fb"
+  },
+  "task": {
+    "instruction": "Implement BankAccount in solution.py: balance attribute, deposit/withdraw; withdrawing more than balance or depositing a non-positive amount raises ValueError and leaves balance unchanged. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "class-bank/verifiers/test_bank.py"
+    ],
+    "command": "{python} -m pytest {verify}test_bank.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard"
+  }
+}

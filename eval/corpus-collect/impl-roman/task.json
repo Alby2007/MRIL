@@ -1,0 +1,32 @@
+{
+  "id": "impl-roman",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-roman/snapshot",
+    "sha256": "1e6e89514d0f5f1339929835400f3fd4c0d73b6efcd3028aacac36b2c7594f26"
+  },
+  "task": {
+    "instruction": "Implement to_roman(n) in solution.py converting integers 1..3999 to Roman numerals including subtractive notation. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_file",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-roman/verifiers/test_roman.py"
+    ],
+    "command": "{python} -m pytest {verify}test_roman.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard"
+  }
+}

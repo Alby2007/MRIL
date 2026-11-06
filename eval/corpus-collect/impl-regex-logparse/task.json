@@ -1,0 +1,34 @@
+{
+  "id": "impl-regex-logparse",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-regex-logparse/snapshot",
+    "sha256": "15ae52b973901f2d84301a24cd0baba72977f8a4bf58e1f91cb40685d7b68c3f"
+  },
+  "task": {
+    "instruction": "Implement parse_log_line(line) in solution.py: parse '[LEVEL] message (code NNN)' into a dict with keys level, message, code where code is an int; lines that don't match the shape, have an invalid level (only DEBUG INFO WARN ERROR allowed), or are empty give back None rather than raising. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-regex-logparse/verifiers/test_r.py"
+    ],
+    "command": "{python} -m pytest {verify}test_r.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard",
+    "family": "regex_parsing",
+    "cell_api": "function"
+  }
+}

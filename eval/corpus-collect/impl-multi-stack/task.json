@@ -1,0 +1,34 @@
+{
+  "id": "impl-multi-stack",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-multi-stack/snapshot",
+    "sha256": "00c59a53d4cf882fbdd7c29fd7f99d9fabb98d8e3cc335951c7b67ecae960f09"
+  },
+  "task": {
+    "instruction": "Implement a small stack calculator in solution.py: push(v) and pop() work on a shared stack, and apply(op) performs the given op where op is 'add', 'sub', 'mul' or 'neg' \u2014 the first three combine the top two values and 'neg' flips the sign of the top one. pop or apply with too few values raises IndexError. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-multi-stack/verifiers/test_m.py"
+    ],
+    "command": "{python} -m pytest {verify}test_m.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium",
+    "family": "multi_function",
+    "cell_api": "function"
+  }
+}
