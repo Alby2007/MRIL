@@ -77,3 +77,82 @@ def classify_failure(verdict: Verdict) -> str | None:
     if _RUNTIME.search(out):
         return "runtime_error"
     return "test_failure"
+
+
+# --------------------------------------------------------------------------
+# Study-05B sanitization contract.
+#
+# Raw pytest output leaks hidden-verifier content: test source lines,
+# expected values, test names, and paths. Recovery feedback must carry only
+# legitimately available facts: check counts, failure category, exit status.
+# --------------------------------------------------------------------------
+
+_COUNT = re.compile(r"(\d+)\s+(failed|passed|error)s?\b", re.I)
+
+# Per-category normalized description (identical information content across
+# categories; wording is part of the frozen arm contract).
+_CATEGORY_LINE = {
+    "assertion_failure": "the code runs but produced wrong results",
+    "contract_error": "interface mismatch: missing or mis-named functions or arguments",
+    "syntax_error": "the code does not parse",
+    "runtime_error": "the code raised an error during execution",
+    "verify_timeout": "the code hangs or is too slow",
+    "test_failure": "one or more checks failed",
+    "verifier_error": "verification infrastructure failed (no information about the code)",
+}
+
+
+def check_counts(stdout: str) -> tuple[int, int]:
+    """(failed, passed) check counts parsed from the pytest summary line."""
+    failed = passed = 0
+    for n, kind in _COUNT.findall(stdout):
+        if kind.lower() == "failed":
+            failed += int(n)
+        elif kind.lower() == "passed":
+            passed += int(n)
+        else:  # error
+            failed += int(n)
+    return failed, passed
+
+
+def sanitize_feedback(verdict: Verdict, category: str) -> str:
+    """Control-arm handoff: the current-format outcome sentence, sanitized.
+
+    Contains NO hidden-verifier content — no test source, expected values,
+    test names, or paths; only counts + category + status.
+    """
+    if verdict.passed is None:
+        return (
+            "Verification could not complete "
+            f"(category: {category}). "
+            + _CATEGORY_LINE.get(category, "verification was inconclusive")
+            + "."
+        )
+    failed, passed = check_counts(verdict.stdout)
+    total = failed + passed
+    return (
+        f"Verification failed: {failed} of {total} checks failed "
+        f"(category: {category})."
+    )
+
+
+def structured_feedback(verdict: Verdict, category: str) -> str:
+    """Challenger-arm handoff: the same legitimate facts as a structured
+    diagnostic block. Identical information content to sanitize_feedback;
+    only the packaging differs."""
+    line = _CATEGORY_LINE.get(category, "one or more checks failed")
+    if verdict.passed is None:
+        return (
+            "Recovery context:\n"
+            "- status: verification inconclusive\n"
+            f"- failure category: {category}\n"
+            f"- assessment: {line}"
+        )
+    failed, passed = check_counts(verdict.stdout)
+    total = failed + passed
+    return (
+        "Recovery context:\n"
+        f"- status: {failed} of {total} checks failed\n"
+        f"- failure category: {category}\n"
+        f"- assessment: {line}"
+    )

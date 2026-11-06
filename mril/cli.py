@@ -104,6 +104,7 @@ def cmd_eval_run(args) -> int:
             fallback_model_id=args.fallback, budget_usd=args.budget
         ),
         keep_workspaces=args.keep_workspaces,
+        capture_dir=Path(args.capture_failures) if args.capture_failures else None,
     )
     from mril.eval.arms import collection_arms
 
@@ -160,6 +161,34 @@ def cmd_eval_report(args) -> int:
     return 0
 
 
+def cmd_eval_probe(args) -> int:
+    """Study-05B: replay captured failure checkpoints under both handoff arms."""
+    from mril.eval import CommandVerifier, OllamaDriver, load_corpus  # noqa: F401
+    from mril.eval.probe import paired_report, run_probe
+    from mril.eval.spec import load_registry
+
+    registry = load_registry(args.registry)
+    models = dict(kv.split("=", 1) for kv in args.ollama_model)
+    driver = OllamaDriver(
+        models, host=args.ollama_host,
+        temperature=args.temperature, top_p=args.top_p, num_ctx=args.num_ctx,
+    )
+    results = run_probe(
+        checkpoints_dir=Path(args.checkpoints),
+        corpus_root=Path(args.corpus),
+        registry=registry,
+        driver=driver,
+        verifier=CommandVerifier(Path(args.corpus)),
+        model_id=args.model,
+        out_dir=Path(args.out),
+        probe_seed=args.probe_seed,
+    )
+    rep = paired_report(results)
+    (Path(args.out) / "PROBE-REPORT.txt").write_text(rep + "\n", encoding="utf-8")
+    print(rep)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="mril", description="Model Routing Intelligence Layer")
     p.add_argument("--db", help="path to the MRIL SQLite ledger (default: mril.db or $MRIL_DB)")
@@ -188,6 +217,8 @@ def main(argv: list[str] | None = None) -> int:
     er.add_argument("--budget", type=float, default=1.0, help="token-priced budget per task")
     er.add_argument("--fallback", help="fallback model_id for degraded path")
     er.add_argument("--keep-workspaces", action="store_true")
+    er.add_argument("--capture-failures", metavar="DIR",
+                    help="snapshot workspace+feedback at each failed attempt (Study-05B)")
     er.add_argument("--ollama-model", action="append", default=[],
                     metavar="REG_ID=TAG", help="registry model_id -> ollama tag (repeatable)")
     er.add_argument("--ollama-host", default="http://127.0.0.1:11434")
@@ -214,6 +245,21 @@ def main(argv: list[str] | None = None) -> int:
     ep.add_argument("out_dir")
     ep.add_argument("--delta", type=float, default=0.05)
     ep.set_defaults(fn=cmd_eval_report)
+
+    pr = evsub.add_parser("probe", help="Study-05B paired handoff probe on captured checkpoints")
+    pr.add_argument("--checkpoints", required=True)
+    pr.add_argument("--corpus", required=True)
+    pr.add_argument("--registry", required=True)
+    pr.add_argument("--out", required=True)
+    pr.add_argument("--model", default="strong-coder")
+    pr.add_argument("--probe-seed", type=int, default=0)
+    pr.add_argument("--ollama-model", action="append", default=[],
+                    metavar="REG_ID=TAG")
+    pr.add_argument("--ollama-host", default="http://127.0.0.1:11434")
+    pr.add_argument("--temperature", type=float, default=0.2)
+    pr.add_argument("--top-p", type=float, default=0.9)
+    pr.add_argument("--num-ctx", type=int, default=8192)
+    pr.set_defaults(fn=cmd_eval_probe)
 
     args = p.parse_args(argv)
     return args.fn(args)

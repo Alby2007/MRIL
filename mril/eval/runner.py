@@ -20,7 +20,12 @@ from mril.core.task import RoutingConstraints, TaskContext
 from mril.eval.arms import Arm, apply_recovery
 from mril.eval.corpus import Corpus
 from mril.eval.drivers import AgentDriver
-from mril.eval.failures import classify_failure
+from mril.eval.failures import (
+    check_counts,
+    classify_failure,
+    sanitize_feedback,
+    structured_feedback,
+)
 from mril.eval.results import RunResult
 from mril.eval.spec import TaskSpec
 from mril.eval.verifier import CommandVerifier
@@ -36,6 +41,34 @@ class EvalRunner:
     verifier: CommandVerifier
     default_constraints: RoutingConstraints
     keep_workspaces: bool = False
+    # Study-05B: when set, every failed attempt's full workspace + sanitized
+    # feedback is snapshotted here for later paired handoff probes.
+    capture_dir: Path | None = None
+
+    def _capture_checkpoint(
+        self, spec: TaskSpec, ws: Workspace, run_task_id: str,
+        attempt_i: int, model_id: str, verdict, category: str | None,
+    ) -> None:
+        import shutil
+
+        cid = f"{run_task_id.replace(':', '_')}__a{attempt_i}"
+        dest = self.capture_dir / cid
+        (dest / "workspace").mkdir(parents=True, exist_ok=True)
+        shutil.copytree(ws.path, dest / "workspace", dirs_exist_ok=True)
+        meta = {
+            "checkpoint_id": cid,
+            "task_id": spec.task_id,
+            "run_task_id": run_task_id,
+            "attempt_index": attempt_i,
+            "model_id": model_id,
+            "failure_category": category,
+            "corpus_root": str(self.verifier.corpus_root),
+            "counts": check_counts(verdict.stdout),
+            "feedback_raw": verdict.stdout[-2000:],
+            "feedback_sanitized": sanitize_feedback(verdict, category or "test_failure"),
+            "feedback_structured": structured_feedback(verdict, category or "test_failure"),
+        }
+        (dest / "checkpoint.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
     def run(
         self,
@@ -125,6 +158,11 @@ class EvalRunner:
                 )
                 if verdict.passed:
                     break
+                if self.capture_dir is not None:
+                    self._capture_checkpoint(
+                        spec, ws, run_task_id, attempt_i, d.model_id,
+                        verdict, classify_failure(verdict),
+                    )
                 feedback = verdict.stdout[-2000:]
                 action = router.next_action(run_task_id, constraints)
                 if action.type == RecoveryType.STOP:
