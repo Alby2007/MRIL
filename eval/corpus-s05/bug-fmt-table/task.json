@@ -1,0 +1,34 @@
+{
+  "id": "bug-fmt-table",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-fmt-table/snapshot",
+    "sha256": "ef77ae553d0b9e2d8595dfa68caba99040aaf13adec2efa1296211f9f909e03a"
+  },
+  "task": {
+    "instruction": "Fix render_table(rows, widths) in solution.py: left-align each cell space-padded to its column width, join with ' | ', treat missing cells as empty and drop cells beyond the width list; do NOT truncate over-wide content. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-fmt-table/verifiers/test_f.py"
+    ],
+    "command": "{python} -m pytest {verify}test_f.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium",
+    "family": "fmt",
+    "cell_api": "fix"
+  }
+}

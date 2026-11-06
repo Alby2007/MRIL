@@ -53,3 +53,7 @@ class RecoveryAction:
     context_tokens: int | None = None
     budget_remaining_usd: float | None = None
     probability: float = 1.0  # propensity under the emitting policy
+    # Action set the policy chose among, after eligibility/budget limits —
+    # e.g. ("retry:weak-coder", "escalate:strong-coder", "stop"). Complete
+    # decision-time support so propensities stay interpretable off-policy.
+    feasible_actions: tuple[str, ...] = ()

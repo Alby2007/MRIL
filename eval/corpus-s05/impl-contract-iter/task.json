@@ -1,0 +1,34 @@
+{
+  "id": "impl-contract-iter",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-contract-iter/snapshot",
+    "sha256": "c7baf25949d81e48d3936e086b35d581844220d7d0a2eaa210b7b3e33ad57fda"
+  },
+  "task": {
+    "instruction": "Implement windowed(it, n) in solution.py: lazily yield successive n-tuples sliding by one over ANY iterable including generators \u2014 tuples not lists, no full materialization, fewer than n elements yields nothing. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-contract-iter/verifiers/test_c.py"
+    ],
+    "command": "{python} -m pytest {verify}test_c.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard",
+    "family": "contract",
+    "cell_api": "function"
+  }
+}

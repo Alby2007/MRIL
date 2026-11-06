@@ -1,0 +1,34 @@
+{
+  "id": "bug-contract-sentinel",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-contract-sentinel/snapshot",
+    "sha256": "8c89937d37caf27ba5dcf5951c6ccf9665fe0998aee611d4080023f6e7697d9f"
+  },
+  "task": {
+    "instruction": "Fix lookup(d, path, default) in solution.py: dotted-path dict access \u2014 return default ONLY when the caller provided one (the default sentinel must never leak as a return value); otherwise raise KeyError. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-contract-sentinel/verifiers/test_c.py"
+    ],
+    "command": "{python} -m pytest {verify}test_c.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "easy",
+    "family": "contract",
+    "cell_api": "fix"
+  }
+}

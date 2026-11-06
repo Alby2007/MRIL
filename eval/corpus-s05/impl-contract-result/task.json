@@ -1,0 +1,34 @@
+{
+  "id": "impl-contract-result",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-contract-result/snapshot",
+    "sha256": "6374705d3028f37bc0c64fb42dda14feb9f2592554a67a77286dc1653b9ee309"
+  },
+  "task": {
+    "instruction": "Implement ok/err/is_ok/unwrap/map_result in solution.py \u2014 a Result-style API: ok(v) and err(msg) wrap outcomes, is_ok discriminates (falsy payloads like 0 or None still count as ok), unwrap returns the value or raises RuntimeError(msg), map_result transforms successes and passes errors through. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-contract-result/verifiers/test_c.py"
+    ],
+    "command": "{python} -m pytest {verify}test_c.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium",
+    "family": "contract",
+    "cell_api": "function"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "id": "bug-state-cache",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-state-cache/snapshot",
+    "sha256": "78e1aac1aa070f2cfc8c97e40222cf1b33739692f4dcb493d4f1cada6cf50fdd"
+  },
+  "task": {
+    "instruction": "Fix TTLCache in solution.py: expired entries must return None AND free their slot \u2014 an expired entry must never block or be counted when evicting. set() must evict the oldest *unexpired* entry only when the cache is full of fresh entries. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-state-cache/verifiers/test_s.py"
+    ],
+    "command": "{python} -m pytest {verify}test_s.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium",
+    "family": "state",
+    "cell_api": "class"
+  }
+}

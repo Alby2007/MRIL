@@ -1,0 +1,34 @@
+{
+  "id": "impl-state-circuit",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-state-circuit/snapshot",
+    "sha256": "3347f58d7711319ebb765fb154f08876a312afb909f9052b417cbdc57f8bab2d"
+  },
+  "task": {
+    "instruction": "Implement CircuitBreaker in solution.py: `threshold` consecutive failures open the circuit; while open, call() returns 'open' without counting; after reset_after ticks a call becomes a probe \u2014 success closes the circuit (streak reset), failure reopens it. A success in closed state resets the consecutive-failure streak. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-state-circuit/verifiers/test_s.py"
+    ],
+    "command": "{python} -m pytest {verify}test_s.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard",
+    "family": "state",
+    "cell_api": "class"
+  }
+}

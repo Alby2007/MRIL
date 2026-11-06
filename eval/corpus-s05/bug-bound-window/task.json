@@ -1,0 +1,34 @@
+{
+  "id": "bug-bound-window",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-bound-window/snapshot",
+    "sha256": "3d3953932b755c3113ee1a86f36fb606c224f9d264f1890ebf41cd2d5c08399e"
+  },
+  "task": {
+    "instruction": "Fix sliding_max(xs, k) in solution.py: it must return the max of every contiguous length-k window, including the final window and the k==len case. Currently the last window is dropped. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-bound-window/verifiers/test_b.py"
+    ],
+    "command": "{python} -m pytest {verify}test_b.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium",
+    "family": "bound",
+    "cell_api": "fix"
+  }
+}

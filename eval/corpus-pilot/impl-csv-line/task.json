@@ -1,0 +1,32 @@
+{
+  "id": "impl-csv-line",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-csv-line/snapshot",
+    "sha256": "4fc0a6fd0a0d14bbdfde8199171f350bd730e829a87f622d007f208a622db16c"
+  },
+  "task": {
+    "instruction": "Implement parse_csv_line(line) in solution.py: parse ONE CSV line into a list of fields. Double-quoted fields may contain commas; \"\" inside quotes is an escaped quote; whitespace outside quotes is stripped but preserved inside quotes. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-csv-line/verifiers/test_csv.py"
+    ],
+    "command": "{python} -m pytest {verify}test_csv.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard"
+  }
+}

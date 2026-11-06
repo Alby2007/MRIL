@@ -20,6 +20,7 @@ from mril.core.task import RoutingConstraints, TaskContext
 from mril.eval.arms import Arm, apply_recovery
 from mril.eval.corpus import Corpus
 from mril.eval.drivers import AgentDriver
+from mril.eval.failures import classify_failure
 from mril.eval.results import RunResult
 from mril.eval.spec import TaskSpec
 from mril.eval.verifier import CommandVerifier
@@ -76,6 +77,7 @@ class EvalRunner:
         )
         ws = Workspace.materialize(spec, self.verifier.corpus_root, work_root, run_task_id.replace(":", "_"))
         t0, model_calls, feedback = time.monotonic(), 0, None
+        route_constraints = constraints
         try:
             for attempt_i in range(spec.max_attempts):
                 if model_calls >= spec.max_model_calls:
@@ -83,7 +85,7 @@ class EvalRunner:
                 if (time.monotonic() - t0) > spec.max_wall_seconds:
                     break
                 attempt_id = new_event_id()
-                d = router.route(ctx, constraints,
+                d = router.route(ctx, route_constraints,
                                  step_index=attempt_i, call_site="attempt")
                 res = self.driver.generate(
                     model_id=d.model_id,
@@ -107,7 +109,7 @@ class EvalRunner:
                     action = router.next_action(run_task_id, constraints)
                     if action.type == RecoveryType.STOP:
                         break
-                    constraints = apply_recovery(constraints, action)
+                    route_constraints = apply_recovery(route_constraints, action)
                     continue
                 verdict = self.verifier.verify(spec, ws)
                 status = (
@@ -118,7 +120,7 @@ class EvalRunner:
                 router.observe_verification(
                     attempt_id, status,
                     task_id=run_task_id, verifier_type="test",
-                    failure_category=None if verdict.passed else "test_failure",
+                    failure_category=classify_failure(verdict),
                     verification_run_id=verdict.run_id,
                 )
                 if verdict.passed:
@@ -127,7 +129,7 @@ class EvalRunner:
                 action = router.next_action(run_task_id, constraints)
                 if action.type == RecoveryType.STOP:
                     break
-                constraints = apply_recovery(constraints, action)
+                route_constraints = apply_recovery(route_constraints, action)
         finally:
             if not self.keep_workspaces:
                 ws.cleanup()

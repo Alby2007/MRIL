@@ -1,0 +1,34 @@
+{
+  "id": "bug-contract-exc",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-contract-exc/snapshot",
+    "sha256": "b997605bf088aabeaa64b1145e48967eaec24d58bd5c0014980669723f8b4f72"
+  },
+  "task": {
+    "instruction": "Fix place_order in solution.py: every contract violation \u2014 non-positive, non-int, or over-stock quantity \u2014 must raise OrderError (the declared exception), not ValueError/RuntimeError. Valid orders return remaining stock. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-contract-exc/verifiers/test_c.py"
+    ],
+    "command": "{python} -m pytest {verify}test_c.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "easy",
+    "family": "contract",
+    "cell_api": "fix"
+  }
+}

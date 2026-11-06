@@ -1,0 +1,34 @@
+{
+  "id": "bug-state-undo",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "bug-state-undo/snapshot",
+    "sha256": "f006e0545ea471a418d22aeabf5dab7d3dd3a6794665d8eebc606d516e8a3456"
+  },
+  "task": {
+    "instruction": "Fix UndoStack in solution.py: actions between end_group() calls form one group; undo() reverses the most recent group \u2014 the still-open group first, then sealed groups newest-first \u2014 returning members in reverse insertion order. Empty stack returns []. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "bug_fix",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "bug-state-undo/verifiers/test_s.py"
+    ],
+    "command": "{python} -m pytest {verify}test_s.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium",
+    "family": "state",
+    "cell_api": "class"
+  }
+}

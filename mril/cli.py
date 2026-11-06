@@ -105,7 +105,10 @@ def cmd_eval_run(args) -> int:
         ),
         keep_workspaces=args.keep_workspaces,
     )
+    from mril.eval.arms import collection_arms
+
     wanted = {a.name: a for a in default_arms()}
+    wanted.update({a.name: a for a in collection_arms(args.collection_seed)})
     if args.empirical_policy:
         from mril.eval.arms import Arm
         from mril.policy.empirical import EmpiricalCheapFirstPolicy, PolicySnapshot
@@ -191,6 +194,8 @@ def main(argv: list[str] | None = None) -> int:
     er.add_argument("--temperature", type=float, default=0.2)
     er.add_argument("--top-p", type=float, default=0.9)
     er.add_argument("--num-ctx", type=int, default=8192)
+    er.add_argument("--collection-seed", type=int, default=0,
+                    help="seed for randomized recovery draws on collect-* arms")
     er.add_argument("--empirical-policy", metavar="SNAPSHOT.json",
                     help="add an empirical-cheap-first arm from a trained snapshot")
     er.set_defaults(fn=cmd_eval_run)

@@ -249,6 +249,7 @@ class Router:
             context_tokens=action.context_tokens,
             budget_remaining_usd=action.budget_remaining_usd,
             selection_probability=action.probability,
+            feasible_actions=list(action.feasible_actions),
             recovery_context=rctx.to_dict(),
             dedupe_key=dedupe_key,
         )
@@ -271,6 +272,7 @@ class Router:
                     context_tokens=stored.context_tokens,
                     budget_remaining_usd=stored.budget_remaining_usd,
                     probability=stored.selection_probability,
+                    feasible_actions=tuple(stored.feasible_actions),
                 )
         return action
 

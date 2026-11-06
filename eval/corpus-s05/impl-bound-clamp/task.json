@@ -1,0 +1,34 @@
+{
+  "id": "impl-bound-clamp",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-bound-clamp/snapshot",
+    "sha256": "55d23fc358bb7ee0fd046f88010770125ca3a13ae417bd69120b187a88d2477a"
+  },
+  "task": {
+    "instruction": "Implement clamp(v, lo, hi) in solution.py: returns v bounded into [lo, hi] inclusive, including negative ranges and exact endpoints. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-bound-clamp/verifiers/test_b.py"
+    ],
+    "command": "{python} -m pytest {verify}test_b.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "easy",
+    "family": "bound",
+    "cell_api": "function"
+  }
+}

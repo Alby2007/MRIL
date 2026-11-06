@@ -1,0 +1,34 @@
+{
+  "id": "impl-regex-slug",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-regex-slug/snapshot",
+    "sha256": "efdfc99dfb50996dde1ba5c970f9b637df847832ffeab29b374ba511ba8ab0a9"
+  },
+  "task": {
+    "instruction": "Implement slugify(text) in solution.py: lowercase the text, turn each run of spaces and underscores into one hyphen, keep only letters, digits and hyphens, and drop hyphens at either end. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-regex-slug/verifiers/test_r.py"
+    ],
+    "command": "{python} -m pytest {verify}test_r.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium",
+    "family": "regex_parsing",
+    "cell_api": "function"
+  }
+}

@@ -172,6 +172,9 @@ class RecoveryDecided(Event):
     # policies are deterministic; a stochastic recovery policy logs its real
     # draw probability so recovery decisions stay off-policy evaluable.
     selection_probability: float = 1.0
+    # Complete feasible action set at decision time, after eligibility and
+    # budget restrictions — the support the propensity was drawn over.
+    feasible_actions: list[str] = field(default_factory=list)
     # Decision-time inputs (RecoveryContext.to_dict()) — what the policy saw,
     # never future outcomes. Lets recovery decisions be replayed offline.
     recovery_context: dict[str, Any] = field(default_factory=dict)

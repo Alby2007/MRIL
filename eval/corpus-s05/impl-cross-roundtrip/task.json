@@ -1,0 +1,34 @@
+{
+  "id": "impl-cross-roundtrip",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-cross-roundtrip/snapshot",
+    "sha256": "8706a2623da81b89e97a378224ea1281bbe87ec5cb95061b4eb24e0d5ef615de"
+  },
+  "task": {
+    "instruction": "Implement to_wire/from_wire in solution.py: serialize a flat dict {str: int|str|None} to 'k=v;k=v' on one line and back, percent-escaping '=', ';' and '%' in keys and values so arbitrary content round-trips. ints must come back as ints, None must survive distinctly from the string 'None'. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "high",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-cross-roundtrip/verifiers/test_c.py"
+    ],
+    "command": "{python} -m pytest {verify}test_c.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "hard",
+    "family": "cross",
+    "cell_api": "function"
+  }
+}

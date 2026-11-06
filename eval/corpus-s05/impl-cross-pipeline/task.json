@@ -1,0 +1,34 @@
+{
+  "id": "impl-cross-pipeline",
+  "schema_version": 1,
+  "repository": {
+    "snapshot": "impl-cross-pipeline/snapshot",
+    "sha256": "9c835e236f2f1b365f09e37d901b5ba23951f154f8012c16d86448d0ab423a23"
+  },
+  "task": {
+    "instruction": "Implement normalize/validate/serialize/process in solution.py. normalize lowercases keys and strips string values; validate returns error strings (name and qty required, qty a positive int); serialize emits 'name=x;qty=N'; process chains them, returning 'ERR:'+first error on failure. The stages must agree on normalized key names and value types. Reply with only the complete file contents.",
+    "language": "python",
+    "category": "feature",
+    "scope": "single_module",
+    "risk": "medium",
+    "target_file": "solution.py"
+  },
+  "verification": {
+    "files": [
+      "impl-cross-pipeline/verifiers/test_c.py"
+    ],
+    "command": "{python} -m pytest {verify}test_c.py -q",
+    "timeout_seconds": 60
+  },
+  "limits": {
+    "max_attempts": 3,
+    "max_model_calls": 8,
+    "max_wall_seconds": 600,
+    "budget_usd": 0.5
+  },
+  "metadata": {
+    "difficulty": "medium",
+    "family": "cross",
+    "cell_api": "function"
+  }
+}
